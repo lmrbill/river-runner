@@ -1,5 +1,6 @@
 package com.riverrunner.ui
 
+import com.riverrunner.Fmt
 import com.riverrunner.engine.Action
 import com.riverrunner.engine.ActionType
 import com.riverrunner.engine.BotStyle
@@ -306,10 +307,10 @@ fun streetName(st: Strings, s: Street) = when (s) {
 
 object Format {
     fun amount(chips: Int, bb: Int, inBB: Boolean): String {
-        if (!inBB || bb <= 0) return "%,d".format(chips)
+        if (!inBB || bb <= 0) return Fmt.grouped(chips)
         val v = chips.toDouble() / bb
-        return if (v >= 100 || v == Math.floor(v)) "%.0f BB".format(v) else "%.1f BB".format(v)
+        return if (v >= 100 || v == kotlin.math.floor(v)) Fmt.fixed(v, 0) + " BB" else Fmt.fixed(v, 1) + " BB"
     }
 
-    fun pct(x: Double): String = "%.0f%%".format(x * 100)
+    fun pct(x: Double): String = Fmt.fixed(x * 100, 0) + "%"
 }

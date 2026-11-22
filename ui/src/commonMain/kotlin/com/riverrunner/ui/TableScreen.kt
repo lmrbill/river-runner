@@ -1,6 +1,7 @@
 package com.riverrunner.ui
 
-import androidx.activity.compose.BackHandler
+import com.riverrunner.Fmt
+import com.riverrunner.PlatformBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -89,7 +90,7 @@ import kotlin.math.roundToInt
 fun TableScreen(vm: AppViewModel) {
     var confirmExit by remember { mutableStateOf(false) }
     var showGuide by remember { mutableStateOf(false) }
-    BackHandler { if (showGuide) showGuide = false else confirmExit = true }
+    PlatformBackHandler { if (showGuide) showGuide = false else confirmExit = true }
     val st = LocalStrings.current
     val ui = vm.tableScreen
     val bb = ui.table?.bigBlind ?: 100
@@ -378,12 +379,12 @@ private fun PracticeHud(info: PracticeInfo, fmt: (Int) -> String) {
     ) {
         HudRow(st.pot, fmt(info.pot), st.toCall, if (info.toCall > 0) fmt(info.toCall) else "0")
         if (info.toCall > 0) {
-            HudRow(st.potOdds, "1 : %.1f".format(info.pot.toDouble() / info.toCall), st.needEquity, Format.pct(info.potOdds))
+            HudRow(st.potOdds, "1 : " + Fmt.fixed(info.pot.toDouble() / info.toCall, 1), st.needEquity, Format.pct(info.potOdds))
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(info.handText, color = Palette.Gold, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
             Text("${st.spr} ", color = Palette.TextDim, fontSize = 11.sp, lineHeight = 15.sp)
-            Text("%.1f".format(info.spr), color = Palette.Text, fontSize = 14.sp, lineHeight = 15.sp, fontFamily = Numeric, fontWeight = FontWeight.SemiBold)
+            Text(Fmt.fixed(info.spr, 1), color = Palette.Text, fontSize = 14.sp, lineHeight = 15.sp, fontFamily = Numeric, fontWeight = FontWeight.SemiBold)
         }
     }
 }

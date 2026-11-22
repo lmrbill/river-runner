@@ -1,6 +1,7 @@
 package com.riverrunner.ui
 
-import androidx.activity.compose.BackHandler
+import com.riverrunner.Fmt
+import com.riverrunner.PlatformBackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -59,9 +60,6 @@ import com.riverrunner.engine.AchievementDef
 import com.riverrunner.engine.Achievements
 import com.riverrunner.engine.Progress
 import com.riverrunner.i18n.LocalStrings
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 fun categoryColor(c: AchCategory): Color = when (c) {
     AchCategory.START -> Color(0xFF46D3E6)
@@ -183,9 +181,9 @@ fun PlayerCard(profile: Profile, slots: Int, maxSlots: Int, onSwitch: () -> Unit
             SmallButton(st.switchSave, onSwitch)
         }
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            CardStat("%,d".format(profile.counter(Progress.HANDS)), st.handsLabel, Palette.Text)
+            CardStat(Fmt.grouped(profile.counter(Progress.HANDS)), st.handsLabel, Palette.Text)
             CardStat(
-                (if (cashBB > 0) "+" else "") + "%.0f".format(cashBB), st.cashBBLabel,
+                (if (cashBB > 0) "+" else "") + Fmt.fixed(cashBB, 0), st.cashBBLabel,
                 if (cashBB > 0) Palette.Green else if (cashBB < 0) Palette.Red else Palette.Text,
             )
             CardStat("${profile.counter(Progress.TOURNEY_WINS)}", st.titlesLabel, Palette.Gold)
@@ -206,14 +204,13 @@ private fun CardStat(value: String, label: String, color: Color) {
 
 @Composable
 fun AchievementsScreen(vm: AppViewModel) {
-    BackHandler { vm.screen = Screen.Home }
+    PlatformBackHandler { vm.screen = Screen.Home }
     AchievementsContent(vm.profile, onBack = { vm.screen = Screen.Home })
 }
 
 @Composable
 fun AchievementsContent(profile: Profile, onBack: () -> Unit) {
     val st = LocalStrings.current
-    val df = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     Column(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SmallButton("←", onBack)
@@ -238,7 +235,7 @@ fun AchievementsContent(profile: Profile, onBack: () -> Unit) {
                         // flowing rows of tiles
                         defs.chunked(3).forEach { row ->
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                row.forEach { d -> AchievementTile(d, profile, df, Modifier.weight(1f)) }
+                                row.forEach { d -> AchievementTile(d, profile, Modifier.weight(1f)) }
                                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
@@ -250,7 +247,7 @@ fun AchievementsContent(profile: Profile, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AchievementTile(d: AchievementDef, profile: Profile, df: SimpleDateFormat, modifier: Modifier) {
+private fun AchievementTile(d: AchievementDef, profile: Profile, modifier: Modifier) {
     val st = LocalStrings.current
     val at = profile.unlocked[d.id]
     val done = at != null
@@ -266,7 +263,7 @@ private fun AchievementTile(d: AchievementDef, profile: Profile, df: SimpleDateF
             Text(if (st.isZh) d.nameZh else d.nameEn, color = if (done) Palette.Text else Palette.TextDim, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             Text(if (st.isZh) d.descZh else d.descEn, color = Palette.TextDim, fontSize = 11.sp, lineHeight = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
-                if (done) st.unlockedOn(df.format(Date(at!!))) else "$value / ${d.target}",
+                if (done) st.unlockedOn(Fmt.date(at!!)) else "$value / ${d.target}",
                 color = if (done) categoryColor(d.category) else Palette.Accent, fontSize = 12.sp,
                 fontFamily = if (done) null else Numeric, fontWeight = FontWeight.SemiBold,
             )
@@ -278,7 +275,7 @@ private fun AchievementTile(d: AchievementDef, profile: Profile, df: SimpleDateF
 
 @Composable
 fun SavesScreen(vm: AppViewModel) {
-    BackHandler { vm.screen = Screen.Home }
+    PlatformBackHandler { vm.screen = Screen.Home }
     SavesContent(
         profiles = vm.profileList, activeId = vm.profile.id, maxSlots = vm.maxSlots,
         defaultName = vm.nextProfileName(),
@@ -365,7 +362,6 @@ fun SavesContent(
 @Composable
 private fun SaveCard(p: Profile, active: Boolean, modifier: Modifier, onUse: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
     val st = LocalStrings.current
-    val df = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     val cashBB = p.counter(Progress.CASH_PROFIT_CENTI_BB) / 100.0
     Column(
         modifier.clip(RoundedCornerShape(14.dp)).background(Palette.Panel)
@@ -389,12 +385,12 @@ private fun SaveCard(p: Profile, active: Boolean, modifier: Modifier, onUse: () 
                         )
                     }
                 }
-                Text(df.format(Date(p.created)), color = Palette.TextDim, fontSize = 11.sp)
+                Text(Fmt.date(p.created), color = Palette.TextDim, fontSize = 11.sp)
             }
         }
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            CardStat("%,d".format(p.counter(Progress.HANDS)), st.handsLabel, Palette.Text)
-            CardStat((if (cashBB > 0) "+" else "") + "%.0f".format(cashBB), st.cashBBLabel, if (cashBB > 0) Palette.Green else if (cashBB < 0) Palette.Red else Palette.Text)
+            CardStat(Fmt.grouped(p.counter(Progress.HANDS)), st.handsLabel, Palette.Text)
+            CardStat((if (cashBB > 0) "+" else "") + Fmt.fixed(cashBB, 0), st.cashBBLabel, if (cashBB > 0) Palette.Green else if (cashBB < 0) Palette.Red else Palette.Text)
             CardStat("${p.counter(Progress.TOURNEY_WINS)}", st.titlesLabel, Palette.Gold)
             CardStat("${p.unlocked.size}/${Achievements.all.size}", st.achievements, Palette.Accent)
         }

@@ -1,6 +1,7 @@
 package com.riverrunner.data
 
-import android.content.Context
+import com.riverrunner.Settings
+import com.riverrunner.TextFiles
 import com.riverrunner.engine.Achievements
 import com.riverrunner.engine.Facts
 import com.riverrunner.engine.GameMode
@@ -8,94 +9,106 @@ import com.riverrunner.engine.HandRecord
 import com.riverrunner.engine.Progress
 import com.riverrunner.engine.StyleMix
 import com.riverrunner.engine.TableType
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.File
-import java.util.Locale
+import com.riverrunner.engine.nowMillis
+import com.riverrunner.locked
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
+import kotlin.math.roundToLong
 
-/** App-wide settings (SharedPreferences). Career data lives in save slots, see [ProfileStore]. */
-class Prefs(context: Context) {
-    private val sp = context.getSharedPreferences("river_runner", Context.MODE_PRIVATE)
+/** App-wide settings (on Android the SharedPreferences file "river_runner"). Career data lives in save slots, see [ProfileStore]. */
+class Prefs(private val sp: Settings, private val systemChinese: Boolean) {
 
     var chinese: Boolean
-        get() = sp.getBoolean("zh", Locale.getDefault().language == "zh")
-        set(v) = sp.edit().putBoolean("zh", v).apply()
+        get() = sp.getBoolean("zh", systemChinese)
+        set(v) = sp.putBoolean("zh", v)
 
     var practiceDefault: Boolean
         get() = sp.getBoolean("practice", true)
-        set(v) = sp.edit().putBoolean("practice", v).apply()
+        set(v) = sp.putBoolean("practice", v)
 
     /** 0 slow, 1 normal, 2 fast */
     var speed: Int
         get() = sp.getInt("speed", 1)
-        set(v) = sp.edit().putInt("speed", v).apply()
+        set(v) = sp.putInt("speed", v)
 
     var sound: Boolean
         get() = sp.getBoolean("sound", true)
-        set(v) = sp.edit().putBoolean("sound", v).apply()
+        set(v) = sp.putBoolean("sound", v)
 
     var deckStyle: String
-        get() = sp.getString("deck", "4") ?: "4"
-        set(v) = sp.edit().putString("deck", v).apply()
+        get() = sp.getString("deck", "4")
+        set(v) = sp.putString("deck", v)
 
     /** Newest changelog version the player has already seen in "What's new" ("" = never shown). */
     var seenChangelog: String
-        get() = sp.getString("seen_changelog", "") ?: ""
-        set(v) = sp.edit().putString("seen_changelog", v).apply()
+        get() = sp.getString("seen_changelog", "")
+        set(v) = sp.putString("seen_changelog", v)
 
     /** After every hand, open its replay before the next deal. */
     var reviewEachHand: Boolean
         get() = sp.getBoolean("review", false)
-        set(v) = sp.edit().putBoolean("review", v).apply()
+        set(v) = sp.putBoolean("review", v)
 
     var showInBB: Boolean
         get() = sp.getBoolean("bb", true)
-        set(v) = sp.edit().putBoolean("bb", v).apply()
+        set(v) = sp.putBoolean("bb", v)
 
     // last used setup
     var lastMode: GameMode
-        get() = GameMode.fromCode(sp.getString("mode", "C") ?: "C")
-        set(v) = sp.edit().putString("mode", v.code).apply()
+        get() = GameMode.fromCode(sp.getString("mode", "C"))
+        set(v) = sp.putString("mode", v.code)
     var lastSize: Int
         get() = sp.getInt("size", 6)
-        set(v) = sp.edit().putInt("size", v).apply()
+        set(v) = sp.putInt("size", v)
     var lastStackBB: Int
         get() = sp.getInt("stackBB", 100)
-        set(v) = sp.edit().putInt("stackBB", v).apply()
+        set(v) = sp.putInt("stackBB", v)
     var lastTableType: TableType
         get() = if (sp.getString("table", "G") == "M") TableType.MIXED else TableType.GTO
         set(v) = sp.edit().putString("table", if (v == TableType.MIXED) "M" else "G").apply()
     var lastHandsPerLevel: Int
         get() = sp.getInt("hpl", 10)
-        set(v) = sp.edit().putInt("hpl", v).apply()
+        set(v) = sp.putInt("hpl", v)
     var lastAnte: Boolean
         get() = sp.getBoolean("ante", false)
-        set(v) = sp.edit().putBoolean("ante", v).apply()
+        set(v) = sp.putBoolean("ante", v)
     /** Mixed-table line-up: "" = random seats, otherwise "M:" + [StyleMix.encode]. */
     var lastStyleMix: StyleMix?
-        get() = sp.getString("mix", "")?.takeIf { it.startsWith("M:") }?.let { StyleMix.decode(it.removePrefix("M:")) }
+        get() = sp.getString("mix", "").takeIf { it.startsWith("M:") }?.let { StyleMix.decode(it.removePrefix("M:")) }
         set(v) = sp.edit().putString("mix", if (v == null) "" else "M:" + v.encode()).apply()
 
     /** Table HUD: each bot's VPIP / PFR / AF for this session. */
     var showHud: Boolean
         get() = sp.getBoolean("hud", false)
-        set(v) = sp.edit().putBoolean("hud", v).apply()
+        set(v) = sp.putBoolean("hud", v)
 
     /** After each of your decisions, show the GTO mix and whether you deviated. */
     var showDeviation: Boolean
         get() = sp.getBoolean("devfb", false)
-        set(v) = sp.edit().putBoolean("devfb", v).apply()
+        set(v) = sp.putBoolean("devfb", v)
 
     /** Career totals written by version 0.2 and earlier (read once when migrating to save slots). */
     fun legacyCareer(): Map<String, Long> {
         if (!sp.contains("c_sessions") && !sp.contains("t_count")) return emptyMap()
         return mapOf(
             Progress.CASH_SESSIONS to sp.getInt("c_sessions", 0).toLong(),
-            Progress.CASH_PROFIT_CENTI_BB to Math.round(sp.getFloat("c_profit", 0f) * 100.0),
+            Progress.CASH_PROFIT_CENTI_BB to (sp.getFloat("c_profit", 0f) * 100.0).roundToLong(),
             Progress.TOURNEYS to sp.getInt("t_count", 0).toLong(),
             Progress.TOURNEY_WINS to sp.getInt("t_wins", 0).toLong(),
             Progress.TOURNEY_ITM to sp.getInt("t_itm", 0).toLong(),
-            Progress.TOURNEY_POINTS to Math.round(sp.getFloat("t_profit", 0f).toDouble()),
+            Progress.TOURNEY_POINTS to sp.getFloat("t_profit", 0f).toDouble().roundToLong(),
         )
     }
 }
@@ -113,23 +126,21 @@ data class Profile(
 ) {
     fun counter(key: String): Long = counters[key] ?: 0L
 
-    fun toJson(): JSONObject = JSONObject().apply {
+    fun toJson(): String = buildJsonObject {
         put("id", id); put("name", name); put("created", created); put("emblem", emblem)
-        put("counters", JSONObject().apply { counters.forEach { (k, v) -> put(k, v) } })
-        put("unlocked", JSONObject().apply { unlocked.forEach { (k, v) -> put(k, v) } })
-    }
+        put("counters", buildJsonObject { counters.forEach { (k, v) -> put(k, v) } })
+        put("unlocked", buildJsonObject { unlocked.forEach { (k, v) -> put(k, v) } })
+    }.toString()
 
     companion object {
-        fun fromJson(o: JSONObject): Profile {
-            fun map(obj: JSONObject?): Map<String, Long> {
-                if (obj == null) return emptyMap()
-                val m = HashMap<String, Long>()
-                obj.keys().forEach { k -> m[k] = obj.getLong(k) }
-                return m
-            }
+        fun fromJson(text: String): Profile {
+            val o = Json.parseToJsonElement(text).jsonObject
+            fun map(obj: Any?): Map<String, Long> =
+                (obj as? JsonObject)?.mapValues { (_, v) -> v.jsonPrimitive.long } ?: emptyMap()
             return Profile(
-                o.getString("id"), o.getString("name"), o.optLong("created"), o.optInt("emblem"),
-                map(o.optJSONObject("counters")), map(o.optJSONObject("unlocked")),
+                o.getValue("id").jsonPrimitive.content, o.getValue("name").jsonPrimitive.content,
+                o["created"]?.jsonPrimitive?.longOrNull ?: 0L, o["emblem"]?.jsonPrimitive?.intOrNull ?: 0,
+                map(o["counters"]), map(o["unlocked"]),
             )
         }
     }
@@ -139,24 +150,22 @@ data class Profile(
  * Save slots stored as files: profiles.json (index), profile_<id>.json, hands_<id>.txt.
  * The first launch after upgrading moves the old single history into the first slot.
  */
-class ProfileStore(private val dir: File, private val prefs: Prefs?, private val defaultName: (Int) -> String) {
+class ProfileStore(private val files: TextFiles, private val prefs: Prefs?, private val defaultName: (Int) -> String) {
     companion object { const val MAX_SLOTS = 6 }
 
-    private val indexFile = File(dir, "profiles.json")
+    private val indexFile = "profiles.json"
     private val profiles = LinkedHashMap<String, Profile>()
     var activeId: String = ""; private set
 
     init {
-        if (indexFile.exists()) {
+        files.read(indexFile)?.let { text ->
             runCatching {
-                val idx = JSONObject(indexFile.readText())
-                val ids = idx.getJSONArray("ids")
-                for (i in 0 until ids.length()) {
-                    val id = ids.getString(i)
-                    val f = profileFile(id)
-                    if (f.exists()) profiles[id] = Profile.fromJson(JSONObject(f.readText()))
+                val idx = Json.parseToJsonElement(text).jsonObject
+                for (e in idx.getValue("ids").jsonArray) {
+                    val id = e.jsonPrimitive.content
+                    files.read(profileFile(id))?.let { profiles[id] = Profile.fromJson(it) }
                 }
-                activeId = idx.optString("active")
+                activeId = (idx["active"] as? JsonPrimitive)?.content ?: ""
             }
         }
         if (profiles.isEmpty()) migrateOrCreate()
@@ -164,28 +173,28 @@ class ProfileStore(private val dir: File, private val prefs: Prefs?, private val
         writeIndex()
     }
 
-    private fun profileFile(id: String) = File(dir, "profile_$id.json")
-    fun historyFile(id: String) = File(dir, "hands_$id.txt")
+    private fun profileFile(id: String) = "profile_$id.json"
+    fun historyFile(id: String) = "hands_$id.txt"
 
     fun all(): List<Profile> = profiles.values.toList()
     fun active(): Profile = profiles.getValue(activeId)
     fun get(id: String): Profile? = profiles[id]
 
-    private fun newId(): String = "p" + System.currentTimeMillis().toString(36) + (100..999).random()
+    private fun newId(): String = "p" + nowMillis().toString(36) + (100..999).random()
 
     private fun migrateOrCreate() {
         val p = create(defaultName(1), activate = true)
-        val legacyHands = File(dir, "hands.txt")
+        val legacyHands = "hands.txt"
         val counters = HashMap<String, Long>()
         if (prefs != null) Progress.apply(counters, prefs.legacyCareer())
-        if (legacyHands.exists()) {
-            legacyHands.forEachLine { line ->
+        files.read(legacyHands)?.let { text ->
+            text.lineSequence().forEach { line ->
                 HandRecord.decode(line)?.let { r -> runCatching { Progress.apply(counters, Facts.forHand(r)) } }
             }
-            legacyHands.renameTo(historyFile(p.id))
+            files.rename(legacyHands, historyFile(p.id))
         }
         if (counters.isNotEmpty()) {
-            val now = System.currentTimeMillis()
+            val now = nowMillis()
             val unlocked = Achievements.newlyUnlocked(counters, emptySet()).associate { it.id to now }
             save(p.copy(counters = counters, unlocked = unlocked))
         }
@@ -194,7 +203,7 @@ class ProfileStore(private val dir: File, private val prefs: Prefs?, private val
     fun create(name: String, activate: Boolean = false): Profile {
         val used = profiles.values.map { it.emblem }.toSet()
         val emblem = (0..3).firstOrNull { it !in used } ?: (profiles.size % 4)
-        val p = Profile(newId(), name, System.currentTimeMillis(), emblem, emptyMap(), emptyMap())
+        val p = Profile(newId(), name, nowMillis(), emblem, emptyMap(), emptyMap())
         profiles[p.id] = p
         save(p)
         if (activate) activeId = p.id
@@ -204,9 +213,7 @@ class ProfileStore(private val dir: File, private val prefs: Prefs?, private val
 
     fun save(p: Profile) {
         profiles[p.id] = p
-        val tmp = File(dir, "profile_${p.id}.tmp")
-        tmp.writeText(p.toJson().toString())
-        tmp.renameTo(profileFile(p.id))
+        files.write(profileFile(p.id), p.toJson())
     }
 
     fun rename(id: String, name: String) {
@@ -220,8 +227,8 @@ class ProfileStore(private val dir: File, private val prefs: Prefs?, private val
     /** Deletes a slot and its files. Deleting the last slot leaves a fresh, empty one. */
     fun delete(id: String) {
         profiles.remove(id) ?: return
-        profileFile(id).delete()
-        historyFile(id).delete()
+        files.delete(profileFile(id))
+        files.delete(historyFile(id))
         if (profiles.isEmpty()) create(defaultName(1), activate = true)
         if (activeId == id) activeId = profiles.keys.first()
         writeIndex()
@@ -234,10 +241,11 @@ class ProfileStore(private val dir: File, private val prefs: Prefs?, private val
     }
 
     private fun writeIndex() {
-        val o = JSONObject()
-        o.put("active", activeId)
-        o.put("ids", JSONArray(profiles.keys.toList()))
-        indexFile.writeText(o.toString())
+        val o = buildJsonObject {
+            put("active", activeId)
+            put("ids", buildJsonArray { profiles.keys.forEach { add(JsonPrimitive(it)) } })
+        }
+        files.write(indexFile, o.toString())
     }
 }
 
@@ -245,20 +253,19 @@ class ProfileStore(private val dir: File, private val prefs: Prefs?, private val
  * Hand histories of one save slot, one encoded line per hand (~400 bytes).
  * Keeps the newest [LIMIT] hands plus every starred hand.
  */
-class HistoryStore(private val file: File) {
+class HistoryStore(private val files: TextFiles, private val file: String) {
     private val records = ArrayList<HandRecord>()
+    private val lock = Any()
 
     companion object { const val LIMIT = 1000 }
 
     init {
-        if (file.exists()) {
-            file.forEachLine { line -> HandRecord.decode(line)?.let { records += it } }
-        }
+        files.read(file)?.lineSequence()?.forEach { line -> HandRecord.decode(line)?.let { records += it } }
     }
 
-    @Synchronized fun all(): List<HandRecord> = records.toList()
+    fun all(): List<HandRecord> = locked(lock) { records.toList() }
 
-    @Synchronized fun add(r: HandRecord) {
+    fun add(r: HandRecord): Unit = locked(lock) {
         records += r
         val nonFav = records.count { !it.favorite }
         if (nonFav > LIMIT) {
@@ -269,38 +276,36 @@ class HistoryStore(private val file: File) {
             }
             rewrite()
         } else {
-            file.appendText(r.encode() + "\n")
+            files.append(file, r.encode() + "\n")
         }
     }
 
-    @Synchronized fun toggleFavorite(id: Long): HandRecord? {
+    fun toggleFavorite(id: Long): HandRecord? = locked(lock) {
         val i = records.indexOfFirst { it.id == id }
-        if (i < 0) return null
+        if (i < 0) return@locked null
         val updated = records[i].copy(favorite = !records[i].favorite)
         records[i] = updated
         rewrite()
-        return updated
+        updated
     }
 
-    @Synchronized fun setFavorite(id: Long, value: Boolean): HandRecord? {
+    fun setFavorite(id: Long, value: Boolean): HandRecord? = locked(lock) {
         val i = records.indexOfFirst { it.id == id }
-        if (i < 0) return null
-        if (records[i].favorite == value) return records[i]
+        if (i < 0) return@locked null
+        if (records[i].favorite == value) return@locked records[i]
         records[i] = records[i].copy(favorite = value)
         rewrite()
-        return records[i]
+        records[i]
     }
 
-    @Synchronized fun clearNonFavorites() {
+    fun clearNonFavorites(): Unit = locked(lock) {
         records.removeAll { !it.favorite }
         rewrite()
     }
 
-    @Synchronized fun count(): Int = records.size
+    fun count(): Int = locked(lock) { records.size }
 
     private fun rewrite() {
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(records.joinToString("") { it.encode() + "\n" })
-        tmp.renameTo(file)
+        files.write(file, records.joinToString("") { it.encode() + "\n" })
     }
 }

@@ -1,6 +1,6 @@
 package com.riverrunner.ui
 
-import androidx.activity.compose.BackHandler
+import com.riverrunner.PlatformBackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,7 +48,7 @@ enum class GuideTab { BASICS, RANKINGS, POSITIONS, GLOSSARY, TIPS, APP }
 
 @Composable
 fun GuideScreen(vm: AppViewModel) {
-    BackHandler { vm.screen = Screen.Home }
+    PlatformBackHandler { vm.screen = Screen.Home }
     GuideContent(onClose = { vm.screen = Screen.Home })
 }
 
@@ -252,7 +252,7 @@ private fun Positions(zh: Boolean) {
             modifier = Modifier.align(Alignment.Center),
         )
         for ((i, l) in labels.withIndex()) {
-            val ang = Math.toRadians(90.0 + i * 45.0)
+            val ang = (90.0 + i * 45.0) * kotlin.math.PI / 180.0
             val x = w / 2 + w * 0.40f * cos(ang).toFloat()
             val y = h / 2 + h * 0.42f * sin(ang).toFloat()
             val color = when (l) {

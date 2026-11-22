@@ -1,5 +1,6 @@
 package com.riverrunner.ui
 
+import com.riverrunner.Fmt
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -106,7 +107,7 @@ class TableGeometry(val w: Float, val h: Float, val n: Int) {
 
     fun seatCenter(rel: Int): Offset {
         if (rel == 0) return heroPod
-        val ang = Math.toRadians(90.0 + rel * 360.0 / n)
+        val ang = (90.0 + rel * 360.0 / n) * kotlin.math.PI / 180.0
         val x = cx + (w / 2 - podW / 2 - 6f) * cos(ang).toFloat()
         val y = cy + h * 0.45f * sin(ang).toFloat()
         return Offset(
@@ -176,7 +177,7 @@ class TableGeometry(val w: Float, val h: Float, val n: Int) {
         val orders = ArrayList<List<Int>>()
         for (k in 0 until maxOf(1, n - 1)) {
             orders += listOf(0) + (0 until n - 1).map { 1 + (k + it) % (n - 1) }
-            orders += listOf(0) + (0 until n - 1).map { 1 + Math.floorMod(k - it, n - 1) }
+            orders += listOf(0) + (0 until n - 1).map { 1 + (k - it).mod(n - 1) }
         }
         for (order in orders) {
             val placed = ArrayList<Box4>()
@@ -511,7 +512,7 @@ private fun WonOrEquity(s: SeatUi, fmt: (Int) -> String) {
     val eq = s.equity
     if (eq != null && s.won == 0) {
         Text(
-            "%.1f%%".format(eq * 100), color = Color.White, fontSize = 14.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold, maxLines = 1,
+            Fmt.fixed(eq * 100, 1) + "%", color = Color.White, fontSize = 14.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold, maxLines = 1,
             modifier = Modifier.clip(RoundedCornerShape(50)).background(Palette.Blue).padding(horizontal = 6.dp, vertical = 1.dp),
         )
     }

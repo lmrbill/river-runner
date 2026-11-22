@@ -1,6 +1,6 @@
 package com.riverrunner.ui
 
-import androidx.activity.compose.BackHandler
+import com.riverrunner.PlatformBackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,7 +58,7 @@ fun ReplayScreen(vm: AppViewModel, initial: HandRecord) {
             else -> { vm.screen = Screen.History }
         }
     }
-    BackHandler(onBack = leave)
+    PlatformBackHandler(onBack = leave)
     var record by remember { mutableStateOf(initial) }
     val st = LocalStrings.current
     ReplayContent(

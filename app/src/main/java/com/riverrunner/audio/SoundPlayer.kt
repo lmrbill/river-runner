@@ -4,12 +4,11 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
 import com.riverrunner.R
+import com.riverrunner.SoundOut
 import kotlin.random.Random
 
-enum class Sound { DEAL, FLIP, CHIP, COLLECT, CHECK, FOLD, TURN, WIN, ALLIN, BLINDS, CLICK, UNLOCK }
-
 /** Short game sounds (synthesised by tools/make_sounds.py) played through a SoundPool. */
-class SoundPlayer(context: Context) {
+class SoundPlayer(context: Context) : SoundOut {
     private val pool: SoundPool = SoundPool.Builder()
         .setMaxStreams(8)
         .setAudioAttributes(
@@ -35,10 +34,10 @@ class SoundPlayer(context: Context) {
         Sound.UNLOCK to R.raw.sfx_unlock,
     ).mapValues { (_, res) -> pool.load(context, res, 1) }
 
-    var enabled = true
+    override var enabled = true
 
     /** [volume] 0..1; a small random pitch change keeps repeated sounds from feeling mechanical. */
-    fun play(sound: Sound, volume: Float = 1f, varyPitch: Boolean = true) {
+    override fun play(sound: Sound, volume: Float, varyPitch: Boolean) {
         if (!enabled) return
         val id = ids[sound] ?: return
         val rate = if (varyPitch) 0.94f + Random.nextFloat() * 0.12f else 1f
@@ -46,5 +45,5 @@ class SoundPlayer(context: Context) {
         pool.play(id, v, v, 1, 0, rate)
     }
 
-    fun release() = pool.release()
+    override fun release() = pool.release()
 }

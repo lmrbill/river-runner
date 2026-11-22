@@ -71,11 +71,12 @@ object Palette {
     val Ink = Color(0xFF0C1310)
 }
 
-/** Condensed numerals for chip amounts and scores (Barlow Condensed, SIL OFL). */
-val Numeric = androidx.compose.ui.text.font.FontFamily(
-    androidx.compose.ui.text.font.Font(com.riverrunner.R.font.barlow_condensed_semibold, FontWeight.SemiBold),
-    androidx.compose.ui.text.font.Font(com.riverrunner.R.font.barlow_condensed_bold, FontWeight.Bold),
-)
+/**
+ * Condensed numerals for chip amounts and scores (Barlow Condensed, SIL OFL). The font files
+ * belong to each app (Android resources, web resources) and come in through [RiverTheme].
+ */
+val Numeric: androidx.compose.ui.text.font.FontFamily
+    @Composable @androidx.compose.runtime.ReadOnlyComposable get() = LocalFonts.current.numeric
 
 fun actColor(k: ActKind?): Color = when (k) {
     ActKind.FOLD -> Color(0xFF5A615D)

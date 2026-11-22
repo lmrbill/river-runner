@@ -1,14 +1,17 @@
 package com.riverrunner.ui
 
-import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.riverrunner.audio.Sound
-import com.riverrunner.audio.SoundPlayer
+import com.riverrunner.Fmt
+import com.riverrunner.IoDispatcher
+import com.riverrunner.Platform
+import com.riverrunner.engine.nowMillis
+import kotlin.math.roundToInt
 import com.riverrunner.data.HistoryStore
 import com.riverrunner.data.ProfileStore
 import com.riverrunner.engine.AchievementDef
@@ -60,14 +63,14 @@ sealed class Screen {
     data object Setup : Screen()
 }
 
-class AppViewModel(app: Application) : AndroidViewModel(app) {
-    val prefs = Prefs(app)
+class AppViewModel(val platform: Platform) : ViewModel() {
+    val prefs = Prefs(platform.settings, platform.systemChinese)
 
     // ------------------------------------------------------------------ save slots
-    private val profiles = ProfileStore(app.filesDir, prefs) { i -> (if (prefs.chinese) ZH else EN).saveDefaultName(i) }
+    private val profiles = ProfileStore(platform.files, prefs) { i -> (if (prefs.chinese) ZH else EN).saveDefaultName(i) }
     var profile by mutableStateOf(profiles.active()); private set
     var profileList by mutableStateOf(profiles.all()); private set
-    var history = HistoryStore(profiles.historyFile(profile.id)); private set
+    var history = HistoryStore(platform.files, profiles.historyFile(profile.id)); private set
 
     /** Achievement just unlocked, shown as a toast over any screen. */
     var unlockToast by mutableStateOf<AchievementDef?>(null); private set
@@ -78,7 +81,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (session != null && screen == Screen.Table) return
         profiles.activate(id)
         profile = profiles.active()
-        history = HistoryStore(profiles.historyFile(profile.id))
+        history = HistoryStore(platform.files, profiles.historyFile(profile.id))
         profileList = profiles.all()
     }
 
@@ -112,7 +115,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         Progress.apply(counters, delta)
         val fresh = Achievements.newlyUnlocked(counters, p.unlocked.keys)
         val unlocked = HashMap(p.unlocked)
-        val now = System.currentTimeMillis()
+        val now = nowMillis()
         fresh.forEach { unlocked[it.id] = now }
         val updated = p.copy(counters = counters, unlocked = unlocked)
         profiles.save(updated)
@@ -151,9 +154,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ------------------------------------------------------------------ what's new
-    /** CHANGELOG.md, packed into the APK as assets/changelog.md. Newest release first. */
+    /** CHANGELOG.md of this build (packed into the APK / the web app). Newest release first. */
     val changelog: List<Changelog.Release> = runCatching {
-        app.assets.open("changelog.md").bufferedReader().use { Changelog.parse(it.readText()) }
+        Changelog.parse(platform.changelogText())
     }.getOrDefault(emptyList())
 
     /** Releases shown in the "What's new" dialog, or null when it is closed. */
@@ -201,7 +204,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var deckStyle by mutableStateOf(DeckStyle.fromCode(prefs.deckStyle)); private set
     fun setDeck(d: DeckStyle) { prefs.deckStyle = d.code; deckStyle = d }
 
-    private val sound = SoundPlayer(app).also { it.enabled = prefs.sound }
+    private val sound = platform.sound.also { it.enabled = prefs.sound }
     var soundOn by mutableStateOf(prefs.sound); private set
     fun setSound(v: Boolean) { prefs.sound = v; soundOn = v; sound.enabled = v }
 
@@ -294,7 +297,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun playAgain() {
         val c = lastConfig ?: return
-        startGame(c.copy(seed = System.nanoTime()))
+        startGame(c.copy(seed = kotlin.random.Random.nextLong()))
     }
 
     fun heroAct(move: Move) { heroMove?.complete(move) }
@@ -340,7 +343,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // nothing until the bot has played a hand this session
         val hud = if (showHud && !it.isHuman) {
             hudStats[it.seat]?.takeIf { st -> st.hands > 0 }?.let { st ->
-                strings.hudShort(Math.round(st.vpip * 100).toInt(), Math.round(st.pfr * 100).toInt())
+                strings.hudShort((st.vpip * 100).roundToInt(), (st.pfr * 100).roundToInt())
             }
         } else null
         SeatInfo(it.seat, if (it.isHuman) strings.you else it.name, it.isHuman, it.stack, !it.alive && it.place > 0, hud)
@@ -389,7 +392,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun runGame(s: GameSession) {
         while (!s.isOver && !quitRequested) {
             val e = s.startHand()
-            handKey = System.nanoTime()
+            handKey = kotlin.random.Random.nextLong()
             actionSeq = 0
             handNumber = s.handNumber + 1
             updateBlinds(s)
@@ -409,7 +412,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val lvl = s.currentLevel()
             val prev = lastBlinds
             if (prev != null && lvl.bigBlind > prev.second) {
-                notice = strings.blindsUpNotice("%,d/%,d".format(prev.first, prev.second), "%,d/%,d".format(lvl.smallBlind, lvl.bigBlind))
+                notice = strings.blindsUpNotice(Fmt.grouped(prev.first) + "/" + Fmt.grouped(prev.second), Fmt.grouped(lvl.smallBlind) + "/" + Fmt.grouped(lvl.bigBlind))
                 sound.play(Sound.BLINDS, 0.8f, varyPitch = false)
                 val shown = notice
                 viewModelScope.launch { delay(4000); if (notice == shown) notice = null }
@@ -483,13 +486,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             actingName = name
                             val think = if (fastForward) 0L else botDelay
                             publish(s, e, TableMapper.Stage.LIVE, think)
-                            val started = System.currentTimeMillis()
+                            val started = nowMillis()
                             val style = s.players[seat].style
                             val ctx = s.tournamentContext()
                             val move = withContext(Dispatchers.Default) {
                                 Bot.decide(e, seat, style, s.random, ctx).sample(s.random)
                             }
-                            pause(think - (System.currentTimeMillis() - started))
+                            pause(think - (nowMillis() - started))
                             apply(e, s, move)
                         }
                         actingName = null
@@ -507,7 +510,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val built = s.completeHand(e)
             val rec = if (starHand) built.copy(favorite = true) else built
             val store = history
-            withContext(Dispatchers.IO) { store.add(rec) }
+            withContext(IoDispatcher) { store.add(rec) }
             lastRecordId = rec.id
             sessionRecords += rec
             lastSessionRecord = rec

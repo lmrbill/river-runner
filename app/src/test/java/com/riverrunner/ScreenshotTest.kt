@@ -130,7 +130,7 @@ class ScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
     private fun shot(name: String, strings: Strings = ZH, content: @Composable () -> Unit) {
-        compose.setContent { RiverTheme(strings) { content() } }
+        compose.setContent { RiverTheme(strings, fonts = AndroidFonts) { content() } }
         repeat(12) {
             compose.mainClock.advanceTimeBy(300)
             Thread.sleep(60)
@@ -300,7 +300,7 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w660dp-h320dp-land-xxhdpi")
     fun t23_home_narrow() {
-        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        val vm = AppViewModel(AndroidPlatform(ApplicationProvider.getApplicationContext<Application>()))
         shot("23_home_narrow") { HomeScreen(vm) }
     }
 
@@ -341,7 +341,7 @@ class ScreenshotTest {
     }
 
     @Test fun t15_home() {
-        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        val vm = AppViewModel(AndroidPlatform(ApplicationProvider.getApplicationContext<Application>()))
         shot("15_home") { HomeScreen(vm) }
     }
 
@@ -385,7 +385,7 @@ class ScreenshotTest {
     }
 
     @Test fun t31_result_report() {
-        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        val vm = AppViewModel(AndroidPlatform(ApplicationProvider.getApplicationContext<Application>()))
         val summary = com.riverrunner.engine.SessionSummary(
             GameMode.CASH,
             listOf(
@@ -431,7 +431,7 @@ class ScreenshotTest {
     }
 
     @Test fun t27_whats_new() {
-        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        val vm = AppViewModel(AndroidPlatform(ApplicationProvider.getApplicationContext<Application>()))
         org.junit.Assert.assertTrue("changelog.md is not in the app assets", vm.changelog.isNotEmpty())
         shot("27_whats_new") {
             androidx.compose.foundation.layout.Box(
@@ -444,7 +444,7 @@ class ScreenshotTest {
     }
 
     @Test fun t28_changelog_all_en() {
-        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        val vm = AppViewModel(AndroidPlatform(ApplicationProvider.getApplicationContext<Application>()))
         shot("28_changelog_all_en", EN) {
             androidx.compose.foundation.layout.Box(
                 androidx.compose.ui.Modifier.fillMaxSize().background(com.riverrunner.ui.Palette.Bg).padding(16.dp),

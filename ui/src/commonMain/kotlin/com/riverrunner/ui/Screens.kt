@@ -1,6 +1,9 @@
 package com.riverrunner.ui
 
-import androidx.activity.compose.BackHandler
+import kotlin.math.roundToInt
+import com.riverrunner.IoDispatcher
+import com.riverrunner.Fmt
+import com.riverrunner.PlatformBackHandler
 import androidx.compose.foundation.background
 import com.riverrunner.engine.Cards
 import com.riverrunner.data.Prefs
@@ -65,9 +68,6 @@ import androidx.compose.foundation.layout.size
 import com.riverrunner.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 // ============================================================================ Home
 
@@ -156,7 +156,7 @@ private fun NavItem(text: String, modifier: Modifier, onClick: () -> Unit) {
 
 @Composable
 fun SetupScreen(vm: AppViewModel) {
-    BackHandler { vm.screen = Screen.Home }
+    PlatformBackHandler { vm.screen = Screen.Home }
     val p = vm.prefs
     SetupContent(
         initial = lastConfig(p),
@@ -342,7 +342,7 @@ fun ResultScreen(
     report: SessionReport? = vm.sessionReport,
 ) {
     val st = LocalStrings.current
-    BackHandler { vm.screen = Screen.Home }
+    PlatformBackHandler { vm.screen = Screen.Home }
     Row(Modifier.fillMaxSize().background(Palette.Bg).padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.width(260.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(st.result, color = Palette.TextDim, fontSize = 14.sp)
@@ -359,7 +359,7 @@ fun ResultScreen(
             val profit = summary.heroProfit
             val unit = if (summary.mode == GameMode.CASH) " BB" else if (st.isZh) " 积分" else " pts"
             Text(
-                "${st.profit}: " + (if (profit >= 0) "+" else "") + "%.1f".format(profit) + unit,
+                "${st.profit}: " + (if (profit >= 0) "+" else "") + Fmt.fixed(profit, 1) + unit,
                 color = if (profit >= 0) Palette.Green else Palette.Red, fontSize = 18.sp, fontWeight = FontWeight.Bold,
             )
             Text("${st.handsPlayed}: ${summary.handsPlayed}", color = Palette.Text, fontSize = 14.sp)
@@ -466,8 +466,8 @@ private fun BotRevealCells(b: BotReveal) {
     val s = b.stats
     Text(
         if (s.hands == 0) "—"
-        else st.hudLine(Math.round(s.vpip * 100).toInt(), Math.round(s.pfr * 100).toInt(), s.hands) +
-            (s.af?.let { " · AF %.1f".format(it) } ?: ""),
+        else st.hudLine((s.vpip * 100).roundToInt(), (s.pfr * 100).roundToInt(), s.hands) +
+            (s.af?.let { " · AF " + Fmt.fixed(it, 1) } ?: ""),
         color = Palette.TextDim, fontSize = 12.sp, fontFamily = Numeric, maxLines = 1,
     )
     Text(
@@ -482,17 +482,16 @@ private fun BotRevealCells(b: BotReveal) {
 @Composable
 fun HistoryScreen(vm: AppViewModel) {
     val st = LocalStrings.current
-    BackHandler { vm.screen = Screen.Home }
+    PlatformBackHandler { vm.screen = Screen.Home }
     var favOnly by remember { mutableStateOf(false) }
     val records = remember { mutableStateListOf<HandRecord>() }
     var loaded by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val all = withContext(Dispatchers.IO) { vm.history.all() }
+        val all = withContext(IoDispatcher) { vm.history.all() }
         records.clear(); records.addAll(all.asReversed())
         loaded = true
     }
     val shown = if (favOnly) records.filter { it.favorite } else records
-    val df = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
 
     Column(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -519,7 +518,7 @@ fun HistoryScreen(vm: AppViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Column(Modifier.width(92.dp)) {
-                        Text(df.format(Date(r.time)), color = Palette.TextDim, fontSize = 11.sp)
+                        Text(Fmt.date(r.time, withTime = true), color = Palette.TextDim, fontSize = 11.sp)
                         Text(
                             (if (r.mode == GameMode.CASH) st.cash else st.tournament) + " #${r.handNumber}",
                             color = Palette.Text, fontSize = 12.sp,
@@ -533,7 +532,7 @@ fun HistoryScreen(vm: AppViewModel) {
                         for (c in r.board) PlayingCard(c, 22.dp)
                     }
                     Text(
-                        (if (net > 0) "+" else "") + "%.1f BB".format(net),
+                        (if (net > 0) "+" else "") + Fmt.fixed(net, 1) + " BB",
                         color = if (net > 0) Palette.Green else if (net < 0) Palette.Red else Palette.TextDim,
                         fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp),
                     )
@@ -558,7 +557,7 @@ fun HistoryScreen(vm: AppViewModel) {
 @Composable
 fun StatsScreen(vm: AppViewModel) {
     val st = LocalStrings.current
-    BackHandler { vm.screen = Screen.Home }
+    PlatformBackHandler { vm.screen = Screen.Home }
     var stats by remember { mutableStateOf<HeroStats?>(null) }
     LaunchedEffect(Unit) {
         stats = withContext(Dispatchers.Default) { Stats.compute(vm.history.all()) }
@@ -583,8 +582,8 @@ fun StatsScreen(vm: AppViewModel) {
                     StatLine(st.threeBet, Format.pct(s.threeBet))
                     StatLine(st.wtsd, Format.pct(s.wtsd))
                     StatLine(st.wsd, Format.pct(s.wsd))
-                    StatLine(st.bbPer100, "%.1f".format(s.bbPer100), s.bbPer100)
-                    StatLine(st.netBB, "%.1f".format(s.netBB), s.netBB)
+                    StatLine(st.bbPer100, Fmt.fixed(s.bbPer100, 1), s.bbPer100)
+                    StatLine(st.netBB, Fmt.fixed(s.netBB, 1), s.netBB)
                 }
             }
             Column(
@@ -595,7 +594,7 @@ fun StatsScreen(vm: AppViewModel) {
                 val s = stats
                 if (s != null) {
                     val order = listOf("UTG", "UTG+1", "UTG+2", "HJ", "CO", "BTN", "SB", "BB")
-                    for (pos in order) s.byPosition[pos]?.let { StatLine(pos, "%.1f".format(it), it) }
+                    for (pos in order) s.byPosition[pos]?.let { StatLine(pos, Fmt.fixed(it, 1), it) }
                 }
             }
             Column(
@@ -606,9 +605,9 @@ fun StatsScreen(vm: AppViewModel) {
                 fun c(k: String) = pr.counter(k)
                 val cashBB = c(Progress.CASH_PROFIT_CENTI_BB) / 100.0
                 SectionTitle(st.careerTitleFor(pr.name))
-                StatLine(st.handsLabel, "%,d".format(c(Progress.HANDS)))
+                StatLine(st.handsLabel, Fmt.grouped(c(Progress.HANDS)))
                 StatLine(st.sessions, "${c(Progress.CASH_SESSIONS)}")
-                StatLine(st.cashProfitBB, "%.1f".format(cashBB), cashBB)
+                StatLine(st.cashProfitBB, Fmt.fixed(cashBB, 1), cashBB)
                 StatLine(st.tournamentsPlayed, "${c(Progress.TOURNEYS)}")
                 StatLine(st.tournamentWins, "${c(Progress.TOURNEY_WINS)}")
                 StatLine(st.itm, "${c(Progress.TOURNEY_ITM)}")
@@ -635,7 +634,7 @@ private fun StatLine(label: String, value: String, signed: Double? = null) {
 @Composable
 fun SettingsScreen(vm: AppViewModel) {
     val st = LocalStrings.current
-    BackHandler { vm.screen = Screen.Home }
+    PlatformBackHandler { vm.screen = Screen.Home }
     var practice by remember { mutableStateOf(vm.prefs.practiceDefault) }
     var speed by remember { mutableIntStateOf(vm.prefs.speed) }
     var confirmClear by remember { mutableStateOf(false) }
@@ -681,10 +680,7 @@ fun SettingsScreen(vm: AppViewModel) {
                 Spacer(Modifier.height(8.dp))
                 Text("github.com/shunzhe1121/river-runner", color = Palette.TextDim, fontSize = 12.sp)
                 Spacer(Modifier.height(14.dp))
-                val ctx = androidx.compose.ui.platform.LocalContext.current
-                val version = remember {
-                    runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
-                }
+                val version = vm.platform.appVersion
                 Text(st.currentVersion(version), color = Palette.TextDim, fontSize = 12.sp, fontFamily = Numeric)
                 Spacer(Modifier.height(6.dp))
                 SmallButton(st.whatsNew, { vm.showChangelog() })

@@ -33,4 +33,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "river-runner"
-include(":engine", ":app", ":web")
+include(":engine", ":ui", ":app", ":web")

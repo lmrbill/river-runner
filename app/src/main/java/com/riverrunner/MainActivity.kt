@@ -14,6 +14,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.riverrunner.ui.AppViewModel
 import com.riverrunner.ui.GuideScreen
 import com.riverrunner.ui.SavesScreen
@@ -42,8 +44,8 @@ class MainActivity : ComponentActivity() {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         setContent {
-            val vm: AppViewModel = viewModel()
-            RiverTheme(vm.strings, vm.deckStyle) {
+            val vm: AppViewModel = viewModel(factory = viewModelFactory { initializer { AppViewModel(AndroidPlatform(applicationContext)) } })
+            RiverTheme(vm.strings, vm.deckStyle, AndroidFonts) {
                 run {
                     Box(Modifier.fillMaxSize().background(Palette.Bg).windowInsetsPadding(WindowInsets.displayCutout)) {
                         when (val s = vm.screen) {
