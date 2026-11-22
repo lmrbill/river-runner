@@ -8,6 +8,14 @@ One section per version, newest first. Each line is `Chinese | English`.
 CI takes the version from the top section (`## 0.4` builds 0.4.x) and copies that section into
 the GitHub release notes; the in-app "What's new" reads this file too.
 
+## 0.7 · 2026-11-22
+
+### 新增 | Added
+- 网页版：iPhone、iPad 和电脑用浏览器打开网址就能练习，功能和安卓版一样；添加到主屏幕后像 App 一样打开，断网也能用 | Web version: on iPhone, iPad and computers the app runs in the browser with the same features as on Android; added to the home screen it opens like an app and works offline
+
+### 改进 | Changed
+- 安卓版和网页版共用同一套界面，以后两边同步更新；安卓版的存档不受影响 | Android and the web version now share one UI and update together; Android saves are unchanged
+
 ## 0.6 · 2026-11-20
 
 ### 改进 | Changed
