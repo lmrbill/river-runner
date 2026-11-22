@@ -25,9 +25,6 @@ import com.riverrunner.web.res.Res
 import com.riverrunner.web.res.barlow_condensed_bold
 import com.riverrunner.web.res.barlow_condensed_semibold
 import com.riverrunner.web.res.noto_sans_sc
-import com.riverrunner.web.res.symbols_1
-import com.riverrunner.web.res.symbols_2
-import com.riverrunner.web.res.symbols_3
 import org.jetbrains.compose.resources.Font
 import kotlin.random.Random
 
@@ -57,14 +54,10 @@ fun WebApp(onFirstFrame: () -> Unit = {}) {
         ),
         text = text,
     )
-    // Icons written as text (⚙ ✕ ⟲ 🏆 ...) come from small symbol fonts, also as fallbacks.
-    val symbols = listOf(
-        FontFamily(Font(Res.font.symbols_1)), FontFamily(Font(Res.font.symbols_2)), FontFamily(Font(Res.font.symbols_3)),
-    )
+    // The same font also carries the few symbols the app writes as text (⚙ ✕ ⟲ 🏆 ...),
+    // see tools/make_web_symbols.py.
     val resolver = LocalFontFamilyResolver.current
-    LaunchedEffect(Unit) {
-        for (f in listOf(text) + symbols) runCatching { resolver.preload(f) }
-    }
+    LaunchedEffect(text) { runCatching { resolver.preload(text) } }
     RiverTheme(vm.strings, vm.deckStyle, fonts) {
         Box(Modifier.fillMaxSize().background(Palette.Bg)) { RiverScreens(vm) }
     }

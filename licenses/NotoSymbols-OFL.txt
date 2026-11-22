@@ -1,4 +1,4 @@
-Noto Sans Symbols 2, Noto Sans Math and Noto Emoji (web app symbol fonts, web/src/commonMain/composeResources/font/symbols_*.ttf)
+Noto Sans Symbols 2, Noto Sans Math and Noto Emoji: a few symbols copied into the web app font (tools/make_web_symbols.py)
 Copyright 2022 The Noto Project Authors (https://github.com/notofonts)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

@@ -8,6 +8,7 @@ Run it again after adding text with new characters:
     pip install fonttools
     npm pack @expo-google-fonts/noto-sans-sc && tar xzf expo-google-fonts-noto-sans-sc-*.tgz
     python tools/make_web_font.py package/400Regular/NotoSansSC_400Regular.ttf
+then tools/make_web_symbols.py, which adds the symbols Noto Sans SC lacks (⚙ ✕ ⟲ ...).
 Noto Sans SC is licensed under the SIL Open Font License 1.1 (licenses/NotoSansSC-OFL.txt).
 """
 import pathlib
