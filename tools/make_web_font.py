@@ -17,7 +17,7 @@ from fontTools import subset
 from fontTools.ttLib import TTFont
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SOURCES = ["app/src/main", "engine/src/commonMain", "web/src", "CHANGELOG.md"]
+SOURCES = ["ui/src", "app/src/main", "engine/src/commonMain", "web/src", "CHANGELOG.md"]
 OUT = ROOT / "web/src/commonMain/composeResources/font/noto_sans_sc.ttf"
 EXTRA = "，。！？：；、“”‘’（）《》【】…—·～￥％＋－×÷＝<>/|\\"
 

@@ -5,4 +5,4 @@ import kotlin.time.ExperimentalTime
 
 /** Wall-clock time in milliseconds, on every platform (JVM, JS, Wasm). */
 @OptIn(ExperimentalTime::class)
-internal fun nowMillis(): Long = Clock.System.now().toEpochMilliseconds()
+fun nowMillis(): Long = Clock.System.now().toEpochMilliseconds()

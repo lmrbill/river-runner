@@ -50,7 +50,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Engine unit tests
-        run: ./gradlew :engine:jvmTest --no-daemon
+        run: |
+          # Retry only when Gradle could not download a plugin or dependency (network).
+          set +e
+          for attempt in 1 2 3; do
+            ./gradlew :engine:jvmTest --no-daemon 2>&1 | tee build.log
+            status=${PIPESTATUS[0]}
+            [ "$status" -eq 0 ] && break
+            grep -qE "was not found in any of the following sources|Could not resolve|Could not GET|Could not HEAD|Connection reset|Read timed out|Connect timed out" build.log || break
+            echo "::warning::Gradle download failed, retrying (attempt $attempt)"
+            sleep 20
+          done
+          exit $status
 
       - name: Restore signing key
         if: github.event_name != 'pull_request'

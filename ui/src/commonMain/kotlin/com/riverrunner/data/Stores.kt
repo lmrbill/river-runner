@@ -77,7 +77,7 @@ class Prefs(private val sp: Settings, private val systemChinese: Boolean) {
         set(v) = sp.putInt("stackBB", v)
     var lastTableType: TableType
         get() = if (sp.getString("table", "G") == "M") TableType.MIXED else TableType.GTO
-        set(v) = sp.edit().putString("table", if (v == TableType.MIXED) "M" else "G").apply()
+        set(v) = sp.putString("table", if (v == TableType.MIXED) "M" else "G")
     var lastHandsPerLevel: Int
         get() = sp.getInt("hpl", 10)
         set(v) = sp.putInt("hpl", v)
@@ -87,7 +87,7 @@ class Prefs(private val sp: Settings, private val systemChinese: Boolean) {
     /** Mixed-table line-up: "" = random seats, otherwise "M:" + [StyleMix.encode]. */
     var lastStyleMix: StyleMix?
         get() = sp.getString("mix", "").takeIf { it.startsWith("M:") }?.let { StyleMix.decode(it.removePrefix("M:")) }
-        set(v) = sp.edit().putString("mix", if (v == null) "" else "M:" + v.encode()).apply()
+        set(v) = sp.putString("mix", if (v == null) "" else "M:" + v.encode())
 
     /** Table HUD: each bot's VPIP / PFR / AF for this session. */
     var showHud: Boolean
