@@ -44,15 +44,15 @@ private val TextDim = Color(0xFF9DAAA2)
  * First web build: checks that the page loads on the phone, Chinese text renders with the
  * bundled font, and the poker engine runs in the browser at a usable speed.
  * [platform] says which build the browser is running ("Wasm" or "JS"); [onFirstFrame] runs once
- * the first frame is on screen.
+ * the first frame is on screen. [bundledFont] false skips the bundled Chinese font (a diagnostic).
  */
 @Composable
-fun App(platform: String, onFirstFrame: () -> Unit = {}) {
+fun App(platform: String, onFirstFrame: () -> Unit = {}, bundledFont: Boolean = true) {
     LaunchedEffect(Unit) {
         withFrameNanos { }
         onFirstFrame()
     }
-    val cjk = FontFamily(Font(Res.font.noto_sans_sc))
+    val cjk = if (bundledFont) FontFamily(Font(Res.font.noto_sans_sc)) else FontFamily.Default
     val base = TextStyle(fontFamily = cjk, color = TextColor, fontSize = 16.sp, textAlign = TextAlign.Center)
     var result by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize().background(Bg), contentAlignment = Alignment.Center) {
