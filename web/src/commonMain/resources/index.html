@@ -38,7 +38,7 @@
             function save(msg) {
                 if (logView) return;
                 saved.push(Math.round((Date.now() - t0) / 1000) + "s " + msg);
-                try { localStorage.setItem("rrBootLog", JSON.stringify({ ready: booted, at: t0, lines: saved.slice(-12) })); } catch (e) {}
+                try { localStorage.setItem("rrBootLog", JSON.stringify({ ready: booted, at: t0, lines: saved.slice(-30) })); } catch (e) {}
             }
             window.__rrLog = function (msg, isErr) {
                 lines.push(isErr ? '<span class="err">' + msg + "</span>" : msg); save(msg); render();
@@ -130,6 +130,31 @@
             window.__rrReady = function () {
                 booted = true;
                 __rrLog("第一帧已绘制");
+                // After the first frame: what was drawn into, and a heartbeat for 15 s. If the log
+                // stops partway, the browser killed the page; if it runs to the end, the page lived
+                // and the white screen is a display problem.
+                try {
+                    // Compose draws into a canvas inside a shadow root
+                    var cs = Array.prototype.slice.call(document.querySelectorAll("canvas")), info = [];
+                    Array.prototype.forEach.call(document.querySelectorAll("*"), function (n) {
+                        if (n.shadowRoot) cs = cs.concat(Array.prototype.slice.call(n.shadowRoot.querySelectorAll("canvas")));
+                    });
+                    for (var i = 0; i < cs.length; i++) {
+                        var r = cs[i].getBoundingClientRect();
+                        info.push(cs[i].width + "x" + cs[i].height + " 显示 " + Math.round(r.width) + "x" + Math.round(r.height));
+                    }
+                    __rrLog("画布 " + cs.length + " 个: " + info.join("; ") + "，屏幕倍率 " + devicePixelRatio);
+                    var gl = document.createElement("canvas").getContext("webgl2");
+                    __rrLog("WebGL2: " + (gl ? "支持，最大纹理 " + gl.getParameter(gl.MAX_TEXTURE_SIZE) : "不支持"));
+                    var top = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+                    __rrLog("屏幕中央的元素: " + (top ? top.tagName + (top.id ? "#" + top.id : "") : "无"));
+                } catch (e) { __rrLog("检查画布出错: " + e, true); }
+                var beats = 0, hb = setInterval(function () {
+                    beats++;
+                    if (beats % 3 === 0 || beats === 1) __rrLog("页面仍在运行 " + beats + " 秒");
+                    if (beats >= 15) { clearInterval(hb); __rrLog("检查结束，页面一直在运行"); }
+                }, 1000);
+                addEventListener("pagehide", function () { __rrLog("页面被关闭或隐藏"); });
                 var l = el("loading"); if (l) l.remove();
             };
             var ua = navigator.userAgent.match(/(iPhone OS [\d_]+|Android [\d.]+|Version\/[\d.]+|Chrome\/\d+|MicroMessenger\/[\d.]+|discover\/[\d.]+|Safari\/[\d.]+)/g);
