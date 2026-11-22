@@ -29,8 +29,17 @@
                 if (s) s.textContent = Math.round((Date.now() - t0) / 1000);
                 if (d) d.innerHTML = lines.slice(-8).join("<br>") + (last ? "<br>" + last : "");
             }
+            // The log is also kept in localStorage, so if the browser kills the page (white screen,
+            // reload) the next visit shows where the previous one stopped.
+            var prev = null;
+            try { prev = JSON.parse(localStorage.getItem("rrBootLog") || "null"); } catch (e) {}
+            var saved = [], booted = false;
+            function save(msg) {
+                saved.push(Math.round((Date.now() - t0) / 1000) + "s " + msg);
+                try { localStorage.setItem("rrBootLog", JSON.stringify({ ready: booted, at: t0, lines: saved.slice(-12) })); } catch (e) {}
+            }
             window.__rrLog = function (msg, isErr) {
-                lines.push(isErr ? '<span class="err">' + msg + "</span>" : msg); render();
+                lines.push(isErr ? '<span class="err">' + msg + "</span>" : msg); save(msg); render();
             };
             window.addEventListener("error", function (e) {
                 var t = e.target;
@@ -40,15 +49,48 @@
             window.addEventListener("unhandledrejection", function (e) {
                 __rrLog("错误: " + (e.reason && (e.reason.message || e.reason)), true);
             });
-            // report each file the app downloads
+            // Report each download with its byte progress. fetch() resolves as soon as the headers
+            // arrive, so the body is counted separately: a slow network then shows up as a slow
+            // download instead of looking like a slow Wasm compile.
+            var downloads = {};
+            function kb(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.round(n / 1024) + " KB"; }
+            function progressLine() {
+                var parts = [];
+                for (var k in downloads) {
+                    var d = downloads[k];
+                    if (!d.done) parts.push(k.slice(0, 10) + " " + kb(d.got) + (d.total ? " / " + kb(d.total) : ""));
+                }
+                last = parts.length ? "正在下载 " + parts.join("，") : "";
+            }
             var origFetch = window.fetch;
             window.fetch = function (input) {
                 var url = (typeof input === "string" ? input : (input && input.url) || "").split("?")[0].split("/").pop();
                 var started = Date.now();
-                last = "正在下载 " + url + " …"; render();
                 return origFetch.apply(this, arguments).then(function (r) {
-                    __rrLog(url + " " + r.status + "（" + ((Date.now() - started) / 1000).toFixed(1) + " 秒）", !r.ok);
-                    last = ""; return r;
+                    if (!r.ok) { __rrLog(url + " " + r.status, true); return r; }
+                    var total = +(r.headers.get("content-length") || 0);
+                    var enc = r.headers.get("content-encoding");
+                    if (!r.body || typeof ReadableStream !== "function") {
+                        __rrLog(url + " 开始下载" + (total ? "（" + kb(total) + "）" : ""));
+                        return r;
+                    }
+                    var d = downloads[url] = { got: 0, total: total, done: false };
+                    var reader = r.body.getReader();
+                    var counted = new ReadableStream({
+                        pull: function (ctl) {
+                            return reader.read().then(function (x) {
+                                if (x.done) {
+                                    d.done = true; progressLine();
+                                    __rrLog(url.slice(0, 16) + " 下载完成 " + kb(d.got) + (enc ? "（" + enc + " 压缩）" : "") +
+                                        "，用时 " + ((Date.now() - started) / 1000).toFixed(1) + " 秒");
+                                    ctl.close(); return;
+                                }
+                                d.got += x.value.byteLength; progressLine(); render();
+                                ctl.enqueue(x.value);
+                            }, function (err) { __rrLog("下载中断 " + url + ": " + err, true); ctl.error(err); });
+                        }
+                    });
+                    return new Response(counted, { status: r.status, statusText: r.statusText, headers: r.headers });
                 }, function (err) { __rrLog("下载失败 " + url + ": " + err, true); throw err; });
             };
             var timer = setInterval(function () {
@@ -84,12 +126,17 @@
             }
             // the app calls this after its first frame
             window.__rrReady = function () {
+                booted = true;
                 __rrLog("第一帧已绘制");
                 var l = el("loading"); if (l) l.remove();
             };
             var ua = navigator.userAgent.match(/(iPhone OS [\d_]+|Android [\d.]+|Version\/[\d.]+|Chrome\/\d+|MicroMessenger\/[\d.]+|discover\/[\d.]+|Safari\/[\d.]+)/g);
             __rrLog((ua || []).join(" ") + (navigator.deviceMemory ? "，内存 " + navigator.deviceMemory + " GB" : ""));
             __rrLog("WebAssembly: " + (typeof WebAssembly === "object" ? "支持" : "不支持"));
+            if (prev && !prev.ready && prev.lines && prev.lines.length) {
+                lines.push('<span class="err">上次打开没有完成，停在：' + prev.lines[prev.lines.length - 1] + "</span>");
+                window.__rrPrev = prev;
+            }
         })();
     </script>
 </head>
