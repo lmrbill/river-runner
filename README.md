@@ -18,7 +18,7 @@
 </p>
 
 > **iPhone / iPad：** 用 Safari 打开 <https://shunzhe1121.github.io/river-runner/>，点“分享”→“添加到主屏幕”，之后从桌面打开，断网也能用。图文步骤见 [iPhone 使用教程](docs/install/iphone-guide.jpg)。
-> 华为 HarmonyOS 5（纯血鸿蒙）不能装 APK，也用这个网址。
+> 鸿蒙手机先试 APK，装不上再用这个网址。
 >
 > **iPhone / iPad:** open the link in Safari, then Share → Add to Home Screen. It runs offline afterwards.
 
