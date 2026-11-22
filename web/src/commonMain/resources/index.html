@@ -9,6 +9,8 @@
     <meta name="apple-mobile-web-app-title" content="River Runner">
     <meta name="theme-color" content="#0C1310">
     <title>River Runner</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon-180.png">
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0C1310; }
         #loading { position: fixed; inset: 0; z-index: 1000; background: #0C1310; display: flex; flex-direction: column; align-items: center;
@@ -162,6 +164,18 @@
                     if (beats >= 15) { clearInterval(hb); __rrLog("检查结束，页面一直在运行"); }
                 }, 1000);
                 addEventListener("pagehide", function () { __rrLog("页面被关闭或隐藏"); });
+                // Offline cache: after the first frame, so it never competes with the first download.
+                if ("serviceWorker" in navigator && location.protocol !== "file:") {
+                    navigator.serviceWorker.register("sw.js").then(function (reg) {
+                        __rrLog(navigator.serviceWorker.controller ? "离线缓存已启用" : "离线缓存安装中，下次打开起可离线使用");
+                        // hand over the files this visit already downloaded
+                        var urls = [location.href].concat(performance.getEntriesByType("resource").map(function (e) { return e.name; }));
+                        var send = function (w) { if (w) w.postMessage({ type: "cache", urls: urls }); };
+                        var w = reg.installing || reg.waiting || reg.active;
+                        if (reg.active) send(reg.active);
+                        else if (w) w.addEventListener("statechange", function () { if (w.state === "activated") send(w); });
+                    }, function (e) { __rrLog("离线缓存不可用: " + e, true); });
+                }
                 var l = el("loading"); if (l) l.remove();
             };
             var ua = navigator.userAgent.match(/(iPhone OS [\d_]+|Android [\d.]+|Version\/[\d.]+|Chrome\/\d+|MicroMessenger\/[\d.]+|discover\/[\d.]+|Safari\/[\d.]+)/g);
@@ -177,7 +191,7 @@
 <body>
     <div id="loading">
         <b>River Runner 加载中…</b>
-        <div>已等待 <span id="secs">0</span> 秒，第一次打开需要下载约 10 MB，之后会快很多</div>
+        <div>已等待 <span id="secs">0</span> 秒，第一次打开需要下载约 4 MB，之后可以离线使用</div>
         <div id="slow" style="display:none">加载较慢，可能是网络连不上 GitHub，可以换个网络或稍后再试</div>
         <div id="diag"></div>
     </div>

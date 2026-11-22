@@ -261,6 +261,9 @@ jobs:
           cd /tmp/site
           # source maps are for debugging only (the two copies of skiko.wasm are both referenced)
           rm -f ./*.map
+          # a new id per deploy makes browsers install the new offline cache (see sw.js)
+          sed -i "s/__RR_BUILD__/${GITHUB_SHA::12}/" sw.js
+          grep -q "${GITHUB_SHA::12}" sw.js || { echo "::error::sw.js build id not set"; exit 1; }
           ls -la
           touch .nojekyll
           echo "${GITHUB_SHA}" > COMMIT
