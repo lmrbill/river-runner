@@ -1,6 +1,6 @@
 // Offline cache for River Runner (web).
 //
-// The first visit downloads about 4 MB; after that every file comes from this cache, so the
+// The first visit downloads about 5 MB; after that every file comes from this cache, so the
 // app opens instantly and works without a network. Each deploy replaces BUILD below (CI
 // writes the commit id), which makes the browser install the new worker. The new worker
 // downloads the new files in the background while the old version keeps working, and takes
