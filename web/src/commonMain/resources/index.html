@@ -101,9 +101,16 @@
                 if (Date.now() - t0 > 20000 && el("slow")) el("slow").style.display = "block";
             }, 500);
             // ?js=1 forces the JS build (as if the browser had no WasmGC), to compare the two builds
-            if (/[?&]js=1/.test(location.search) && typeof WebAssembly === "object") {
+            // Safari (every browser on iPhone is Safari underneath) kills the page a few seconds after
+            // the first frame with the Wasm build, while the JS build runs, so WebKit gets the JS build.
+            // ?wasm=1 tries the Wasm build anyway (to recheck after a Compose or Safari update).
+            var ua0 = navigator.userAgent;
+            var webkit = /iPhone|iPad|iPod/.test(ua0) || (/Safari\//.test(ua0) && !/Chrome|Chromium|CriOS|Android/.test(ua0)) ||
+                (/Macintosh/.test(ua0) && navigator.maxTouchPoints > 1);
+            var forceJs = /[?&]js=1/.test(location.search) || (webkit && !/[?&]wasm=1/.test(location.search));
+            if (forceJs && typeof WebAssembly === "object") {
                 WebAssembly.validate = function () { return false; };
-                __rrLog("已强制使用 JS 版");
+                __rrLog(webkit ? "Safari 内核，使用 JS 版" : "已强制使用 JS 版");
             }
             var origError = console.error;
             console.error = function () {
