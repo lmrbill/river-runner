@@ -33,8 +33,10 @@
             // reload) the next visit shows where the previous one stopped.
             var prev = null;
             try { prev = JSON.parse(localStorage.getItem("rrBootLog") || "null"); } catch (e) {}
-            var saved = [], booted = false;
+            var saved = [], booted = false, logView = /[?&]log=1/.test(location.search);
+            window.__rrPrevAll = prev;
             function save(msg) {
+                if (logView) return;
                 saved.push(Math.round((Date.now() - t0) / 1000) + "s " + msg);
                 try { localStorage.setItem("rrBootLog", JSON.stringify({ ready: booted, at: t0, lines: saved.slice(-12) })); } catch (e) {}
             }
@@ -148,7 +150,27 @@
         <div id="diag"></div>
     </div>
     <!-- after the body exists: the app attaches to it -->
-    <script type="application/javascript" src="riverRunner.js"
-            onload="__rrLog('启动脚本已加载')"></script>
+    <script>
+        // ?log=1 shows the full log of the previous visit and does not start the app,
+        // so a white screen can still be explained afterwards.
+        if (/[?&]log=1/.test(location.search)) {
+            var p = window.__rrPrevAll;
+            document.querySelector("#loading b").textContent = "上次打开的记录";
+            document.getElementById("slow").style.display = "none";
+            document.getElementById("loading").children[1].textContent =
+                p ? (p.ready ? "上次已经画出第一帧（之后白屏说明是画面显示的问题）" : "上次没有画出第一帧（页面中途停止或被关闭）") : "没有记录";
+            document.getElementById("diag").style.display = "none";
+            var pl = document.createElement("div");
+            pl.style.cssText = "font-size:13px;line-height:1.7;color:#9DAAA2;max-width:520px;word-break:break-all";
+            pl.innerHTML = p ? p.lines.join("<br>") : "";
+            document.getElementById("loading").appendChild(pl);
+            window.__rrLog = function () {};
+        } else {
+            var sc = document.createElement("script");
+            sc.src = "riverRunner.js";
+            sc.onload = function () { __rrLog("启动脚本已加载"); };
+            document.body.appendChild(sc);
+        }
+    </script>
 </body>
 </html>
