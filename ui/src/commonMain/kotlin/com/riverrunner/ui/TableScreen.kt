@@ -256,10 +256,14 @@ private fun SidePanel(
         ) { mode ->
             when (mode) {
                 0 -> ui.legal?.let { HeroControls(it, fmt, ui.table?.bigBlind ?: 100, onMove) }
-                1 -> ActionButton(
-                    if (ui.sessionOver) st.viewResults else st.nextHand + "  ▶", Palette.CallBtn,
-                    modifier = Modifier.fillMaxWidth().height(46.dp), onClick = onNext,
-                )
+                1 -> {
+                    // same spot as the action buttons a moment ago: a late tap must not skip the result
+                    val armed by rememberArmed(ui.handOver)
+                    ActionButton(
+                        if (ui.sessionOver) st.viewResults else st.nextHand + "  ▶", Palette.CallBtn,
+                        modifier = Modifier.fillMaxWidth().height(46.dp), onClick = { if (armed) onNext() },
+                    )
+                }
                 else -> WaitingBar(ui, onFastForward)
             }
         }
@@ -550,6 +554,10 @@ private fun presets(st: Strings, la: LegalActions, bb: Int): List<Pair<String, I
 private fun HeroControls(la: LegalActions, fmt: (Int) -> String, bb: Int, onMove: (Move) -> Unit) {
     val st = LocalStrings.current
     var target by remember(la) { mutableIntStateOf(defaultTarget(la, bb)) }
+    // These buttons appear where "fast forward" was: ignore taps for a moment so a repeated tap
+    // on fast forward cannot fold, call or raise.
+    val armed by rememberArmed(la)
+    val move: (Move) -> Unit = { if (armed) onMove(it) }
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             val p = pulse()
@@ -588,14 +596,14 @@ private fun HeroControls(la: LegalActions, fmt: (Int) -> String, bb: Int, onMove
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth().height(46.dp)) {
             if (la.canCheck) {
-                ActionButton(st.check, Palette.CallBtn, modifier = Modifier.weight(1f).fillMaxHeight()) { onMove(Move.CHECK) }
+                ActionButton(st.check, Palette.CallBtn, modifier = Modifier.weight(1f).fillMaxHeight()) { move(Move.CHECK) }
             } else {
-                ActionButton(st.fold, Palette.FoldBtn, modifier = Modifier.weight(1f).fillMaxHeight()) { onMove(Move.FOLD) }
+                ActionButton(st.fold, Palette.FoldBtn, modifier = Modifier.weight(1f).fillMaxHeight()) { move(Move.FOLD) }
                 val callAllIn = la.toCall >= la.maxRaiseTo - la.myStreetBet
                 ActionButton(
                     if (callAllIn) st.allIn else st.call, if (callAllIn) Palette.AllInBtn else Palette.CallBtn,
                     sub = fmt(la.toCall), modifier = Modifier.weight(1f).fillMaxHeight(),
-                ) { onMove(Move.CALL) }
+                ) { move(Move.CALL) }
             }
             if (la.canRaise) {
                 val isAllIn = target >= la.maxRaiseTo
@@ -609,7 +617,7 @@ private fun HeroControls(la: LegalActions, fmt: (Int) -> String, bb: Int, onMove
                     sub = fmt(target),
                     textColor = if (isAllIn) Palette.Text else Palette.Ink,
                     modifier = Modifier.weight(if (la.canCheck) 1.4f else 1.2f).fillMaxHeight(),
-                ) { onMove(Move.raiseTo(target)) }
+                ) { move(Move.raiseTo(target)) }
             }
         }
     }

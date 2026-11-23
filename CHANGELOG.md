@@ -16,6 +16,10 @@ the GitHub release notes; the in-app "What's new" reads this file too.
 ### 改进 | Changed
 - 安卓版和网页版共用同一套界面，以后两边同步更新；安卓版的存档不受影响 | Android and the web version now share one UI and update together; Android saves are unchanged
 
+### 修复 | Fixed
+- 连点“快进”时，轮到你后的弃牌、跟注、加注按钮可能被误触；“下一手”按钮同样处理 | Tapping fast forward repeatedly could hit the fold, call or raise button that appears in its place when your turn comes; the same for "Next hand"
+- iPhone 网页版：按钮跑到屏幕外、底部黑边、侧面留空 | iPhone web version: buttons off screen, a black band at the bottom, unused space at the side
+
 ## 0.6 · 2026-11-20
 
 ### 改进 | Changed

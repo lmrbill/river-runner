@@ -186,6 +186,21 @@ fun Pill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
     }
 }
 
+/**
+ * False for the first [delayMs] after [key] changes, then true. Buttons that appear where
+ * another button just was (your action buttons replacing "fast forward", "next hand" replacing
+ * them) ignore taps until armed, so a tap meant for the old button never lands on the new one.
+ */
+@Composable
+fun rememberArmed(key: Any?, delayMs: Long = 450): androidx.compose.runtime.State<Boolean> {
+    val armed = androidx.compose.runtime.remember(key) { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(key) {
+        kotlinx.coroutines.delay(delayMs)
+        armed.value = true
+    }
+    return armed
+}
+
 @Composable
 fun ActionButton(
     text: String,
