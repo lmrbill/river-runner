@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -207,6 +207,7 @@
 </head>
 <body>
     <div id="app"></div>
+    <div id="safe" style="position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)"></div>
     <script>
         // Keep the app exactly inside the part of the screen you can see. Safari's toolbars come
         // and go, and the page can be scrolled or zoomed by a stray gesture; the visual viewport
@@ -219,14 +220,26 @@
                 if (vv && vv.scale > 1.01) {
                     // a zoom slipped through: setting the viewport again resets it
                     var m = document.querySelector('meta[name="viewport"]');
-                    m.setAttribute("content", "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no");
-                    setTimeout(function () { m.setAttribute("content", "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"); }, 50);
+                    m.setAttribute("content", "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, shrink-to-fit=no");
+                    setTimeout(function () { m.setAttribute("content", "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"); }, 50);
                 }
-                var w = vv ? vv.width : window.innerWidth, h = vv ? vv.height : window.innerHeight;
-                app.style.width = Math.round(w) + "px";
-                app.style.height = Math.round(h) + "px";
-                app.style.top = (vv ? Math.round(vv.offsetTop) : 0) + "px";
-                app.style.left = (vv ? Math.round(vv.offsetLeft) : 0) + "px";
+                // From the home screen the whole screen is ours; in a Safari tab, the part between its toolbars.
+                var standalone = navigator.standalone === true ||
+                    (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+                var x = 0, y = 0, w = window.innerWidth, h = window.innerHeight;
+                if (!standalone && vv) { x = vv.offsetLeft; y = vv.offsetTop; w = vv.width; h = vv.height; }
+                // The page covers the whole screen (viewport-fit=cover). iOS reserves wide margins for
+                // the notch / Dynamic Island and the home indicator; the app only keeps clear of what
+                // would really cover it: up to 50 px on the side with the camera (the island ends
+                // about 48 px from the edge), the top in portrait, and nothing for the home indicator,
+                // which is a thin line drawn over the app.
+                var cs = getComputedStyle(document.getElementById("safe"));
+                var inset = function (side) { return parseFloat(cs["padding" + side]) || 0; };
+                var l = Math.min(inset("Left"), 50), r = Math.min(inset("Right"), 50), t = inset("Top");
+                app.style.left = Math.round(x + l) + "px";
+                app.style.top = Math.round(y + t) + "px";
+                app.style.width = Math.max(0, Math.round(w - l - r)) + "px";
+                app.style.height = Math.max(0, Math.round(h - t)) + "px";
             }
             if (vv) { vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); }
             window.addEventListener("resize", fit);
