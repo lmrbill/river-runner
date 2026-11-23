@@ -35,7 +35,9 @@
         #rotate .phone { width: 46px; height: 78px; border: 3px solid #E6B54F; border-radius: 9px;
                          animation: rr-turn 2.4s ease-in-out infinite; }
         @keyframes rr-turn { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
-        @media (orientation: portrait) and (max-width: 900px) { #rotate { display: flex; } }
+        /* shown only when turning the phone would help: a portrait window that fills the screen
+           (not split view on an unfolded phone or iPad, not a narrow desktop window; see fit()) */
+        html.rr-rotate #rotate { display: flex; }
     </style>
     <script>
         // Loading diagnostics: elapsed time, files being fetched, and any error, shown on the
@@ -240,6 +242,13 @@
                 app.style.top = Math.round(y + t) + "px";
                 app.style.width = Math.max(0, Math.round(w - l - r)) + "px";
                 app.style.height = Math.max(0, Math.round(h - t)) + "px";
+                // Ask to turn the phone only when the window is portrait and fills (nearly) the
+                // whole screen. In split view a tall narrow window is normal and turning the device
+                // does not change it, so the app is shown as a landscape strip instead (WebApp.kt).
+                var sShort = Math.min(screen.width, screen.height), sLong = Math.max(screen.width, screen.height);
+                var fullScreen = window.innerWidth >= sShort * 0.9 && window.innerHeight >= sLong * 0.7;
+                var touch = navigator.maxTouchPoints > 0;
+                document.documentElement.classList.toggle("rr-rotate", touch && fullScreen && window.innerHeight > window.innerWidth);
             }
             if (vv) { vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); }
             window.addEventListener("resize", fit);

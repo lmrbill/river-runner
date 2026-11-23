@@ -4,11 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
@@ -67,11 +69,15 @@ fun WebApp(onFirstFrame: () -> Unit = {}) {
         // app. In Safari on a phone the toolbars leave less than that (often about 320 dp high),
         // which pushed buttons off the bottom; below that size everything is drawn a little
         // smaller instead, so the whole screen always fits.
-        BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Bg)) {
+        // In a portrait window that cannot be turned (split view on an unfolded phone or iPad, a
+        // narrow desktop window) the landscape layout is shown as a 16:9 strip across the width.
+        BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Bg), contentAlignment = Alignment.Center) {
+            val w = maxWidth
+            val h = if (maxHeight > maxWidth) minOf(maxHeight, maxWidth * PORTRAIT_STRIP) else maxHeight
             val density = LocalDensity.current
-            val shrink = minOf(1f, maxHeight.value / MIN_HEIGHT_DP, maxWidth.value / MIN_WIDTH_DP)
+            val shrink = minOf(1f, h.value / MIN_HEIGHT_DP, w.value / MIN_WIDTH_DP)
             CompositionLocalProvider(LocalDensity provides Density(density.density * shrink, density.fontScale)) {
-                Box(Modifier.fillMaxSize()) { RiverScreens(vm) }
+                Box(Modifier.size(w / shrink, h / shrink)) { RiverScreens(vm) }
             }
         }
     }
@@ -79,6 +85,7 @@ fun WebApp(onFirstFrame: () -> Unit = {}) {
 
 private const val MIN_HEIGHT_DP = 360f
 private const val MIN_WIDTH_DP = 640f
+private const val PORTRAIT_STRIP = 9f / 16f
 
 /** localStorage keys start with this, so other pages on the same site cannot collide. */
 private const val PREFIX = "rr."
