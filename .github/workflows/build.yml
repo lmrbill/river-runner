@@ -125,12 +125,18 @@ jobs:
           name: river-runner-apk
           path: river-runner-*.apk
 
-      - name: Publish rolling "latest" release
+      # Every build of main is its own release (v0.7.76, v0.7.77, ...) and is kept, so GitHub's
+      # download counts add up instead of starting from zero with each build. The newest one is
+      # marked "latest", so https://github.com/<repo>/releases/latest always opens it.
+      - name: Publish release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           CERT=$(grep -m1 "SHA-256 digest" signer.txt | sed 's/.*digest: //')
+          TAG="v${VERSION_NAME}"
+          # downloads of every release so far (the new one starts at 0)
+          TOTAL=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" -q '[.[].assets[].download_count] | add // 0' | awk '{s+=$1} END {print s+0}')
           {
             cat release-notes.md
             echo
@@ -138,16 +144,28 @@ jobs:
             echo
             echo "Automatic build of ${GITHUB_SHA::7}. Full history: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)"
             echo
+            echo "累计下载（此前所有版本）/ Downloads of all earlier releases: ${TOTAL}"
+            echo
             echo "**签名密钥已在 0.3.0 更换**：从 0.2.x 升级请先卸载旧版本再安装，签名不同无法直接覆盖。"
             echo
             echo "Signing key changed at 0.3.0: uninstall the 0.2.x build before installing this one."
             echo
             echo "Signer certificate SHA-256: ${CERT}"
           } > notes.md
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest river-runner-*.apk --prerelease \
-            --title "Latest build (${VERSION_NAME})" \
-            --notes-file notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # a re-run of the same build: replace the file, keep the release
+            gh release upload "$TAG" river-runner-*.apk --clobber
+          else
+            gh release create "$TAG" river-runner-*.apk --target "$GITHUB_SHA" --latest \
+              --title "River Runner ${VERSION_NAME}" --notes-file notes.md
+          fi
+          # The old rolling "latest" release (before 0.7.76) is kept for its download count;
+          # its text points to the current release.
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest --title "Old rolling build, no longer updated" --notes "**这个发布已停止更新。**最新版请到：https://github.com/${GITHUB_REPOSITORY}/releases/latest
+
+          This rolling release is no longer updated; every build now has its own release so download counts add up. Latest version: https://github.com/${GITHUB_REPOSITORY}/releases/latest"
+          fi
 
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')

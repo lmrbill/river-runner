@@ -10,11 +10,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/shunzhe1121/river-runner/releases/tag/latest"><img alt="Download the latest APK (1.6 MB)" src="https://img.shields.io/badge/%E2%AC%87%20Download%20APK-1.6%20MB-E6B54F?style=for-the-badge&labelColor=0C1310&logo=android&logoColor=0C1310"></a>
+  <a href="https://github.com/shunzhe1121/river-runner/releases/latest"><img alt="Download the latest APK (1.6 MB)" src="https://img.shields.io/badge/%E2%AC%87%20Download%20APK-1.6%20MB-E6B54F?style=for-the-badge&labelColor=0C1310&logo=android&logoColor=0C1310"></a>
   <br>
   <a href="https://shunzhe1121.github.io/river-runner/"><img alt="Open the web version (iPhone, iPad, computer)" src="https://img.shields.io/badge/%F0%9F%8C%90%20iPhone%20%2F%20Web-open%20in%20Safari-1F6B47?style=for-the-badge&labelColor=0C1310"></a>
   <br>
-  <sub><a href="https://github.com/shunzhe1121/river-runner/releases/tag/latest">Direct APK link</a> · <a href="https://github.com/shunzhe1121/river-runner/releases">all releases</a> · <a href="CHANGELOG.md">更新日志 / changelog</a> · Android 8.0+ · <a href="docs/install/使用说明.txt">安装说明</a></sub>
+  <img alt="Total downloads" src="https://img.shields.io/github/downloads/shunzhe1121/river-runner/total?label=downloads&style=flat-square&color=1F6B47">
+  <br>
+  <sub><a href="https://github.com/shunzhe1121/river-runner/releases/latest">Direct APK link</a> · <a href="https://github.com/shunzhe1121/river-runner/releases">all releases</a> · <a href="CHANGELOG.md">更新日志 / changelog</a> · Android 8.0+ · <a href="docs/install/使用说明.txt">安装说明</a></sub>
 </p>
 
 > **iPhone / iPad：** 用 Safari 打开 <https://shunzhe1121.github.io/river-runner/>，点“分享”→“添加到主屏幕”，之后从桌面打开，断网也能用。图文步骤见 [iPhone 使用教程](docs/install/iphone-guide.jpg)。
