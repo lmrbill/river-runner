@@ -31,6 +31,7 @@ import com.riverrunner.web.res.Res
 import com.riverrunner.web.res.barlow_condensed_bold
 import com.riverrunner.web.res.barlow_condensed_semibold
 import com.riverrunner.web.res.noto_sans_sc
+import com.riverrunner.web.res.noto_sans_sc_bold
 import org.jetbrains.compose.resources.Font
 import kotlin.random.Random
 
@@ -52,7 +53,11 @@ fun WebApp(onFirstFrame: () -> Unit = {}) {
     val vm = remember { AppViewModel(WebPlatform) }
     // The browser has no system fonts for the canvas: Chinese comes from the bundled Noto Sans SC.
     // Preloading also makes it the fallback for text in other families (such as the numerals).
-    val text = FontFamily(Font(Res.font.noto_sans_sc))
+    // A real bold cut: Skia's synthetic bold filled in letters such as the Q on the cards.
+    val text = FontFamily(
+        Font(Res.font.noto_sans_sc, FontWeight.Normal),
+        Font(Res.font.noto_sans_sc_bold, FontWeight.Bold),
+    )
     val fonts = AppFonts(
         numeric = FontFamily(
             Font(Res.font.barlow_condensed_semibold, FontWeight.SemiBold),

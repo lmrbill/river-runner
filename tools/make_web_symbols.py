@@ -6,6 +6,7 @@ first of these fonts that has it (all SIL Open Font License 1.1, see licenses/):
     npm pack @expo-google-fonts/noto-sans-symbols-2 @expo-google-fonts/noto-sans-math @expo-google-fonts/noto-emoji
     (unpack each) then
     python tools/make_web_symbols.py NotoSansSC.ttf NotoSansSymbols2.ttf NotoSansMath.ttf NotoEmoji.ttf
+    python tools/make_web_symbols.py --target=noto_sans_sc_bold.ttf NotoSansSC.ttf ... (same fonts)
 Run after make_web_font.py: the symbols are merged into its noto_sans_sc.ttf (adds about 15 KB),
 because Compose for web 1.9 does not fall back from one bundled font to another.
 """
@@ -24,7 +25,12 @@ OUT_DIR = pathlib.Path(__file__).resolve().parent.parent / "web/src/commonMain/c
 TARGET = OUT_DIR / "noto_sans_sc.ttf"
 
 
-def main(base_font: str, *symbol_fonts: str) -> None:
+def main(*args: str) -> None:
+    global TARGET
+    if args and args[0].startswith("--target="):
+        TARGET = OUT_DIR / args[0].split("=", 1)[1]
+        args = args[1:]
+    base_font, *symbol_fonts = args
     base = TTFont(base_font).getBestCmap()
     todo = sorted(c for c in used_characters() if ord(c) > 0x7F and ord(c) not in base)
     base = TTFont(TARGET)

@@ -19,6 +19,7 @@ the GitHub release notes; the in-app "What's new" reads this file too.
 ### 修复 | Fixed
 - 连点“快进”时，轮到你后的弃牌、跟注、加注按钮可能被误触；“下一手”按钮同样处理 | Tapping fast forward repeatedly could hit the fold, call or raise button that appears in its place when your turn comes; the same for "Next hand"
 - iPhone 网页版：按钮跑到屏幕外、底部黑边、侧面留空 | iPhone web version: buttons off screen, a black band at the bottom, unused space at the side
+- 网页版：分屏时不再一直提示“请横过手机”；粗体字改用真正的粗体字体，牌面上的 Q 不再被涂满 | Web version: no rotate prompt in split view; a real bold font, so the Q on cards is no longer filled in
 
 ## 0.6 · 2026-11-20
 
