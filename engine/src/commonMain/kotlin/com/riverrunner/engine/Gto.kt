@@ -1,8 +1,8 @@
 package com.riverrunner.engine
 
 /**
- * Flop texture classes and hand-strength buckets. Both must match tools/flop-solve
- * (flops.py `key`, main.rs `buckets` and `draw`), because the solved data is keyed by them.
+ * Board classes and hand-strength buckets. All must match tools/flop-solve (flops.py `key`,
+ * main.rs `buckets`, `draw`, `card_class` and `flop_family`), because the solved data is keyed by them.
  */
 object FlopTexture {
     /** e.g. "R-U-K-0": rainbow / two-tone / monotone, unpaired / paired, high card, connected. */
@@ -19,19 +19,46 @@ object FlopTexture {
         return "$suit-U-$hb-${if (span <= 4) 1 else 0}"
     }
 
-    /** A flush draw or an 8-out straight draw that uses a hole card, without a straight or better already. */
+    /** M monotone, P paired (or trips), U otherwise; the river data is grouped by it. */
+    fun family(flop: List<Int>): Char = when {
+        flop.take(3).map { Cards.rank(it) }.toSet().size < 3 -> 'P'
+        flop.take(3).map { Cards.suit(it) }.toSet().size == 1 -> 'M'
+        else -> 'U'
+    }
+
+    private fun straight(m: Int): Boolean {
+        val x = (m shl 1) or ((m ushr 12) and 1)
+        return (0..9).any { lo -> (x ushr lo) and 0b11111 == 0b11111 }
+    }
+
+    private fun rankMask(cs: List<Int>) = cs.fold(0) { m, c -> m or (1 shl Cards.rank(c)) }
+
+    /**
+     * What a new board card does: F third card of a suit, P pairs the board, S first card that
+     * lets two hole cards make a straight, O new high card, else B (blank).
+     */
+    fun cardClass(before: List<Int>, card: Int): Char {
+        if (before.count { Cards.suit(it) == Cards.suit(card) } == 2) return 'F'
+        if (before.any { Cards.rank(it) == Cards.rank(card) }) return 'P'
+        fun possible(m: Int) = (0 until 13).any { a -> (0 until a).any { b -> straight(m or (1 shl a) or (1 shl b)) } }
+        val bm = rankMask(before)
+        if (!possible(bm) && possible(bm or (1 shl Cards.rank(card)))) return 'S'
+        if (before.all { Cards.rank(it) < Cards.rank(card) }) return 'O'
+        return 'B'
+    }
+
+    /**
+     * A flush draw or an 8-out straight draw that uses a hole card, without a straight or better
+     * already. Never on the river.
+     */
     fun hasDraw(hole: IntArray, board: List<Int>): Boolean {
+        if (board.size >= 5) return false
         val cards = board + hole.toList()
         if (HandEvaluator.category(HandEvaluator.evaluate(cards.toIntArray())) >= HandEvaluator.STRAIGHT) return false
         for (s in 0 until 4) {
             if (cards.count { Cards.suit(it) == s } == 4 && hole.any { Cards.suit(it) == s }) return true
         }
-        fun ranks(cs: List<Int>) = cs.fold(0) { m, c -> m or (1 shl Cards.rank(c)) }
-        fun straight(m: Int): Boolean {
-            val x = (m shl 1) or ((m ushr 12) and 1)
-            return (0..9).any { lo -> (x ushr lo) and 0b11111 == 0b11111 }
-        }
-        val all = ranks(cards); val brd = ranks(board)
+        val all = rankMask(cards); val brd = rankMask(board)
         val outs = (0 until 13).count { r -> (all ushr r) and 1 == 0 && straight(all or (1 shl r)) && !straight(brd or (1 shl r)) }
         return outs >= 2
     }
@@ -53,7 +80,7 @@ object FlopTexture {
 
     /**
      * Bucket 0..19: the hand's strength decile within the range [lo, hi) of the starting-hand
-     * order on this flop (ties count half), plus 10 with a draw.
+     * order on this board (ties count half), plus 10 with a draw.
      */
     fun bucket(hole: IntArray, board: List<Int>, lo: Double, hi: Double): Int {
         val boardMask = Cards.mask(board.toIntArray())
@@ -71,20 +98,27 @@ object FlopTexture {
     }
 }
 
-/** Solved flop decisions (see [FlopGtoData]). */
-object FlopGto {
-    /** One solved decision: who acts (0 = out of position), the actions, and percentages by bucket. */
-    class Node(val player: Int, val actions: List<String>, val freq: List<IntArray>)
+/** Solved postflop decisions (see [GtoData]). */
+object Gto {
+    /** One solved decision: who acts (0 = out of position), the actions, and frequencies by bucket. */
+    class Node(val player: Int, val actions: List<String>, val freq: List<DoubleArray>)
 
-    private val cache = HashMap<String, Node?>()
+    private const val ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
 
-    fun node(spot: String, board: List<Int>, path: String): Node? {
-        val k = "$spot/${FlopTexture.key(board)}/$path"
-        return cache.getOrPut(k) {
-            FlopGtoData.TABLE[k]?.let { v ->
-                val (p, a, rows) = v.split('|')
-                Node(p.toInt(), a.split(','), rows.split(';').map { r -> r.split(',').map { it.toInt() }.toIntArray() })
-            }
+    private val table: Map<String, Node> by lazy {
+        val map = HashMap<String, Node>()
+        for (line in GtoData.CHUNKS.joinToString("").split('\n')) {
+            val f = line.split('\t')
+            if (f.size != 4) continue
+            val actions = f[2].split(',')
+            val n = actions.size
+            val freq = List(f[3].length / n) { b -> DoubleArray(n) { i -> ALPHABET.indexOf(f[3][b * n + i]) / 63.0 } }
+            map[f[0]] = Node(f[1].toInt(), actions, freq)
         }
+        map
     }
+
+    fun node(key: String): Node? = table[key]
+
+    val size: Int get() = table.size
 }
