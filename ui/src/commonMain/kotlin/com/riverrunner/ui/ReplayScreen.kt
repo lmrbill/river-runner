@@ -174,22 +174,29 @@ fun ReplayContent(
         }
     }
 
-    // hero decision on this frame (just taken, or about to be taken)
+    // the decision on this frame (just taken, or about to be taken), by any player at the table
     val actionsSoFar = frames.take(idx + 1).count { it.action != null }
+    val justTaken = frame.action
+    val decisionSeat = when {
+        justTaken != null -> justTaken.seat
+        !frame.isEnd && frame.toAct >= 0 -> frame.toAct
+        else -> -1
+    }
     val decisionIndex = when {
-        frame.action?.seat == record.heroSeat -> actionsSoFar - 1
-        frame.toAct == record.heroSeat && !frame.isEnd -> actionsSoFar
+        justTaken != null -> actionsSoFar - 1
+        decisionSeat >= 0 -> actionsSoFar
         else -> -1
     }
     val voluntary = record.actions.filter { !it.type.isPost }
-    val heroAction = if (decisionIndex >= 0) voluntary.getOrNull(decisionIndex) else null
+    val decisionAction = if (decisionIndex >= 0) voluntary.getOrNull(decisionIndex) else null
     val policyCache = remember(record.id) { mutableStateMapOf<Int, Policy>() }
     LaunchedEffect(decisionIndex) {
-        if (decisionIndex >= 0 && policyCache[decisionIndex] == null) {
+        if (decisionIndex >= 0 && decisionSeat >= 0 && policyCache[decisionIndex] == null) {
             val p = withContext(Dispatchers.Default) {
                 runCatching {
                     val e = replayer.engineBeforeAction(decisionIndex)
-                    Bot.decide(e, record.heroSeat, BotStyle.GTO, Random(record.id + decisionIndex))
+                    // what GTO would do with this player's own cards and what they could see
+                    Bot.decide(e, decisionSeat, BotStyle.GTO, Random(record.id + decisionIndex))
                 }.getOrNull()
             }
             if (p != null) policyCache[decisionIndex] = p
@@ -228,7 +235,11 @@ fun ReplayContent(
                 SmallButton("▶", { if (idx < frames.size - 1) idx++ }, Modifier.weight(1.3f), highlight = true)
                 SmallButton("⏭", { idx = frames.size - 1 }, Modifier.weight(1f))
             }
-            if (heroAction != null) AnalysisCard(heroAction, frame.action?.seat == record.heroSeat, policy, fmt)
+            if (decisionAction != null && decisionAction.seat == decisionSeat) {
+                val who = if (decisionSeat == record.heroSeat) null
+                    else record.players.firstOrNull { it.seat == decisionSeat }?.name
+                AnalysisCard(decisionAction, justTaken != null, who, policy, fmt)
+            }
             ActionLog(log, Modifier.weight(1f), highlightIndex = idx, onClick = { idx = it })
             if (onContinue != null) {
                 ActionButton(continueLabel ?: st.reviewNext, Palette.Gold, Modifier.fillMaxWidth(), textColor = Palette.Ink, onClick = onContinue)
@@ -238,14 +249,24 @@ fun ReplayContent(
 }
 
 @Composable
-private fun AnalysisCard(heroAction: Action, decided: Boolean, policy: Policy?, fmt: (Int) -> String) {
+private fun AnalysisCard(
+    heroAction: Action,
+    decided: Boolean,
+    /** the player's name, or null for you */
+    who: String?,
+    policy: Policy?,
+    fmt: (Int) -> String,
+) {
     val st = LocalStrings.current
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi).padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (decided) {
-            Text("${st.yourAction}: ${TableMapper.actionLabel(st, heroAction, fmt)}", color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            val label = if (who == null) st.yourAction else st.actionOf(who)
+            Text("$label: ${TableMapper.actionLabel(st, heroAction, fmt)}", color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        } else if (who != null) {
+            Text(st.toActNow(who), color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
         if (policy == null) {
             Text(st.computing, color = Palette.TextDim, fontSize = 12.sp)

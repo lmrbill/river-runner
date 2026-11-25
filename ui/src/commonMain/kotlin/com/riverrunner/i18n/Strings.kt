@@ -74,6 +74,10 @@ data class Strings(
     val prev: String,
     val next: String,
     val yourAction: String,
+    /** another player's action in hand review, e.g. "Echo's action" */
+    val actionOf: (String) -> String,
+    /** another player about to act in hand review */
+    val toActNow: (String) -> String,
     val gtoSuggest: String,
     val deviation: String,
     val inLine: String,
@@ -304,6 +308,8 @@ val ZH = Strings(
     prev = "上一步",
     next = "下一步",
     yourAction = "你的动作",
+    actionOf = { "$it 的动作" },
+    toActNow = { "轮到 $it 行动" },
     gtoSuggest = "GTO建议",
     deviation = "偏离",
     inLine = "符合",
@@ -550,6 +556,8 @@ val EN = Strings(
     prev = "Prev",
     next = "Next",
     yourAction = "Your action",
+    actionOf = { "$it's action" },
+    toActNow = { "$it to act" },
     gtoSuggest = "GTO",
     deviation = "Deviation",
     inLine = "In line",
