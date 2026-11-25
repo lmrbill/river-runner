@@ -91,6 +91,8 @@ data class Strings(
     val gotIt: String,
     val allUpdates: String,
     val currentVersion: (String) -> String,
+    val exportSaves: String,
+    val importSaves: String,
     // line-up, HUD, live deviation, session report
     val lineup: String,
     val presetName: (com.riverrunner.engine.TablePreset?) -> String,
@@ -319,6 +321,8 @@ val ZH = Strings(
     gotIt = "知道了",
     allUpdates = "全部更新记录",
     currentVersion = { "当前版本 $it" },
+    exportSaves = "导出存档",
+    importSaves = "导入存档",
     lineup = "牌桌阵容",
     presetName = { when (it) {
         com.riverrunner.engine.TablePreset.RANDOM -> "随机"
@@ -563,6 +567,8 @@ val EN = Strings(
     gotIt = "Got it",
     allUpdates = "All updates",
     currentVersion = { "Version $it" },
+    exportSaves = "Export saves",
+    importSaves = "Import saves",
     lineup = "Line-up",
     presetName = { when (it) {
         com.riverrunner.engine.TablePreset.RANDOM -> "Random"

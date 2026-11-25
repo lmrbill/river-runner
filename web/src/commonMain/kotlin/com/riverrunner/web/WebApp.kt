@@ -46,6 +46,10 @@ internal expect fun playAudio(url: String, volume: Double, rate: Double)
 internal expect fun browserPrompt(title: String, initial: String): String?
 /** The page's address without query or fragment. */
 internal expect fun browserPageUrl(): String
+/** True when the page defines window[name] as a function (the save export and import panels). */
+internal expect fun browserHasHook(name: String): Boolean
+/** Calls window[name](), if the page defines it. */
+internal expect fun browserCallHook(name: String)
 
 /** The whole app, as on Android. [onFirstFrame] runs once the first frame is on screen. */
 @Composable
@@ -108,6 +112,12 @@ internal object WebPlatform : Platform {
     override fun changelogText(): String = BuildInfo.CHANGELOG
     override val textPrompt: ((String, String) -> String?) = ::browserPrompt
     override val pageUrl: String get() = browserPageUrl()
+    // The panels themselves are plain HTML in the page (index.html), so each page that hosts the
+    // app decides what they do: the GitHub Pages site exports, the Claude page also imports.
+    override val exportSaves: (() -> Unit)?
+        get() = if (browserHasHook("__rrExport")) ({ browserCallHook("__rrExport") }) else null
+    override val importSaves: (() -> Unit)?
+        get() = if (browserHasHook("__rrImport")) ({ browserCallHook("__rrImport") }) else null
 }
 
 /** Settings as strings in localStorage ("rr.set.<key>"). */
