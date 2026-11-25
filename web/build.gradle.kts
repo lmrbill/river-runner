@@ -1,3 +1,5 @@
+import java.time.LocalDate
+import java.time.ZoneOffset
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 // Web version of River Runner for iPhone and other browsers. Built twice: Wasm for current
@@ -50,7 +52,7 @@ abstract class GenerateBuildInfo : DefaultTask() {
                 "internal object BuildInfo {\n" +
                 "    const val VERSION = " + literal(base + "." + runNumber.get()) + "\n" +
                 "    const val COMMIT = " + literal(commit.get().take(7)) + "\n" +
-                "    const val BUILD_DATE = " + literal(java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString()) + "\n" +
+                "    const val BUILD_DATE = " + literal(LocalDate.now(ZoneOffset.UTC).toString()) + "\n" +
                 "    val CHANGELOG: String = " + literal(text) + "\n}\n"
         )
     }
