@@ -1,7 +1,7 @@
 name: Solve flops
 
-# Runs the offline flop solver (tools/flop-solve) on every flop in flops.txt, spread over
-# parallel jobs, and pushes the JSON results to the gto-data branch. Not part of the app build:
+# Runs the offline solver (tools/flop-solve) on every flop in flops.txt for each spot, spread over
+# parallel jobs, and pushes the JSON results (flop, turn and river decisions) to the gto-data branch. Not part of the app build:
 # it only runs when the solver or its flop list changes on the gto-upgrade branch, or by hand.
 on:
   push:
@@ -19,7 +19,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        # single-raised pots take about 6 minutes a flop, 3-bet pots under 1
+        include:
+          - { spot: srp, parts: 16, part: 0 }
+          - { spot: srp, parts: 16, part: 1 }
+          - { spot: srp, parts: 16, part: 2 }
+          - { spot: srp, parts: 16, part: 3 }
+          - { spot: srp, parts: 16, part: 4 }
+          - { spot: srp, parts: 16, part: 5 }
+          - { spot: srp, parts: 16, part: 6 }
+          - { spot: srp, parts: 16, part: 7 }
+          - { spot: srp, parts: 16, part: 8 }
+          - { spot: srp, parts: 16, part: 9 }
+          - { spot: srp, parts: 16, part: 10 }
+          - { spot: srp, parts: 16, part: 11 }
+          - { spot: srp, parts: 16, part: 12 }
+          - { spot: srp, parts: 16, part: 13 }
+          - { spot: srp, parts: 16, part: 14 }
+          - { spot: srp, parts: 16, part: 15 }
+          - { spot: 3bp, parts: 4, part: 0 }
+          - { spot: 3bp, parts: 4, part: 1 }
+          - { spot: 3bp, parts: 4, part: 2 }
+          - { spot: 3bp, parts: 4, part: 3 }
     steps:
       - uses: actions/checkout@v4
       - name: Build solver
@@ -32,13 +53,13 @@ jobs:
         working-directory: tools/flop-solve
         run: |
           mkdir -p out
-          awk -v p=${{ matrix.part }} '(NR - 1) % 20 == p' flops.txt | while read -r cls flop; do
-            ./target/release/rr-flop-solve srp "$flop" 300 1.0 > "out/srp-$flop.json"
+          awk -v p=${{ matrix.part }} -v n=${{ matrix.parts }} '(NR - 1) % n == p' flops.txt | while read -r cls flop; do
+            ./target/release/rr-flop-solve ${{ matrix.spot }} "$flop" 300 1.0 > "out/${{ matrix.spot }}-$flop.json"
           done
           ls -la out
       - uses: actions/upload-artifact@v4
         with:
-          name: solved-${{ matrix.part }}
+          name: solved-${{ matrix.spot }}-${{ matrix.part }}
           path: tools/flop-solve/out/*.json
 
   publish:
