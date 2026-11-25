@@ -20,3 +20,6 @@ internal actual fun playAudio(url: String, volume: Double, rate: Double) {
 
 internal actual fun browserPrompt(title: String, initial: String): String? =
     js("(function(t, i){ try { return window.prompt(t, i); } catch (e) { return null; } })")(title, initial) as String?
+
+internal actual fun browserPageUrl(): String =
+    js("(function(){ try { return location.origin + location.pathname; } catch (e) { return ''; } })()") as String

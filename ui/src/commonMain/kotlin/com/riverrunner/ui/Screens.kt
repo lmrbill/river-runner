@@ -678,10 +678,12 @@ fun SettingsScreen(vm: AppViewModel) {
                 SectionTitle(st.about)
                 Text(st.aboutText, color = Palette.Text, fontSize = 13.sp, lineHeight = 19.sp)
                 Spacer(Modifier.height(8.dp))
-                Text("github.com/shunzhe1121/river-runner", color = Palette.TextDim, fontSize = 12.sp)
+                Text("github.com/lmrbill/river-runner", color = Palette.TextDim, fontSize = 12.sp)
+                Text("based on github.com/shunzhe1121/river-runner (MIT)", color = Palette.TextDim, fontSize = 11.sp)
                 Spacer(Modifier.height(14.dp))
                 val version = vm.platform.appVersion
                 Text(st.currentVersion(version), color = Palette.TextDim, fontSize = 12.sp, fontFamily = Numeric)
+                vm.platform.pageUrl?.takeIf { it.isNotEmpty() }?.let { Text(it, color = Palette.TextDim, fontSize = 12.sp) }
                 Spacer(Modifier.height(6.dp))
                 SmallButton(st.whatsNew, { vm.showChangelog() })
             }
