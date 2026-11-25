@@ -12,7 +12,10 @@ the GitHub release notes; the in-app "What's new" reads this file too.
 
 ### 改进 | Changed
 - GTO 机器人和复盘建议：短筹码小盲对大盲（以及单挑）改用求解出的推/弃纳什范围 | GTO bots and replay suggestions: short-stack small blind vs big blind (and heads-up) now uses solved push/fold Nash ranges
-- GTO 机器人和复盘建议：单次加注的单挑底池、加注者有位置时，翻牌圈改用求解器算出的策略（49 类牌面、98 个代表翻牌） | GTO bots and replay suggestions: in heads-up single-raised pots with the raiser in position, flop play now comes from solver output (49 board textures, 98 representative flops)
+- GTO 机器人和复盘建议：单挑的单次加注底池（加注者有位置）和 3-bet 底池（3-bet 者无位置）中，翻牌、转牌、河牌都改用求解器算出的策略（49 类牌面、98 个代表翻牌）；多人底池仍用近似策略 | GTO bots and replay suggestions: in heads-up single-raised pots (raiser in position) and 3-bet pots (3-bettor out of position), flop, turn and river play now come from solver output (49 board textures, 98 representative flops); multiway pots still use the approximation
+
+### 修复 | Fixed
+- 网页版（iPhone）：重命名或新建存档时键盘弹不出来，现在改用系统输入框 | Web on iPhone: renaming or creating a save could not bring up the keyboard; it now uses the system's text box
 
 ## 0.7 · 2026-11-22
 

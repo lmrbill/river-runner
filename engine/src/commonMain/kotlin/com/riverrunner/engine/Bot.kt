@@ -598,67 +598,108 @@ object Bot {
     }
 
     /**
-     * Flop play from solved data ([FlopGto]) for a heads-up single-raised pot where the preflop
-     * raiser is in position and stacks are deep. Null when the spot is not covered, so the
-     * caller falls back to the rule-based play.
+     * Postflop play from solved data ([Gto]) for the heads-up spots the solver covers, with
+     * stacks near the solved depth: a single-raised pot with the raiser in position ("srp"), and
+     * a 3-bet pot with the 3-bettor out of position ("3bp"). Null when the spot or the line so
+     * far is not covered; the caller then falls back to the rule-based play.
      */
-    private fun solvedFlop(engine: HandEngine, seat: Int, la: LegalActions, eq: Double): Policy? {
+    private fun solvedPostflop(engine: HandEngine, seat: Int, la: LegalActions, eq: Double): Policy? {
         val live = engine.players.filter { !it.folded }
         if (live.size != 2 || live.any { it.allIn }) return null
         val pre = engine.actions.filter { it.street == Street.PREFLOP && !it.type.isPost }
         val raises = pre.filter { it.type.isAggressive }
-        if (raises.size != 1) return null
-        val raiser = raises[0].seat
-        val caller = live.first { it.seat != raiser }.seat
-        if (live.none { it.seat == raiser }) return null
         val order = engine.order
-        if (order.indexOf(raiser) < order.indexOf(caller)) return null   // solved with the raiser in position
-        // pot and stacks when the flop came
+        val ranges = preflopRanges(engine)
+        val spot: String
+        val oop: Int
+        val ip: Int
+        val oopRange: RangeEstimate
+        val ipRange: RangeEstimate
+        when (raises.size) {
+            1 -> {
+                ip = raises[0].seat
+                oop = live.firstOrNull { it.seat != ip }?.seat ?: return null
+                if (live.none { it.seat == ip } || order.indexOf(ip) < order.indexOf(oop)) return null
+                spot = "srp"
+                val w = ranges.getValue(ip).hi
+                ipRange = RangeEstimate(0.0, w)
+                oopRange = if (oop == engine.bigBlindSeat) RangeEstimate(w * 0.30, min(0.75, w * 1.9 + 0.08)) else ranges.getValue(oop)
+            }
+            2 -> {
+                oop = raises[1].seat; ip = raises[0].seat
+                if (live.none { it.seat == ip } || live.none { it.seat == oop } || order.indexOf(oop) > order.indexOf(ip)) return null
+                spot = "3bp"
+                val w = ranges.getValue(oop).hi
+                oopRange = RangeEstimate(0.0, w)
+                ipRange = RangeEstimate(max(0.02, w * 0.33), max(0.06, w * 1.05))
+            }
+            else -> return null
+        }
+        // stacks near the solved depth (stack-to-pot when the flop came: 17.7 and 4.6)
         val potStart = engine.actions.filter { it.street == Street.PREFLOP }.sumOf { it.amount }
-        val flopActs = engine.actions.filter { it.street == Street.FLOP }
-        val stackAtFlop = live.minOf { it.stack + flopActs.filter { a -> a.seat == it.seat }.sumOf { a -> a.amount } }
-        if (stackAtFlop < potStart * 6) return null
-        // the flop action so far, in the solver's labels
+        val post = engine.actions.filter { it.street != Street.PREFLOP }
+        val stackAtFlop = live.minOf { p -> p.stack + post.filter { it.seat == p.seat }.sumOf { it.amount } }
+        val spr = stackAtFlop.toDouble() / potStart
+        if (spot == "srp" && spr < 8.0 || spot == "3bp" && (spr < 2.5 || spr > 8.0)) return null
+        // each street's actions, in the solver's labels
         var pot = potStart
-        val labels = ArrayList<String>()
-        for (a in flopActs) {
-            labels += when (a.type) {
+        val lines = Street.entries.drop(1).map { mutableListOf<String>() }
+        for (a in post) {
+            val i = a.street.ordinal - 1
+            lines[i] += when (a.type) {
                 ActionType.CHECK -> "X"
                 ActionType.CALL -> "C"
-                ActionType.BET -> {
-                    val r = a.amount.toDouble() / pot
-                    if (a.allIn || r > 1.2) return null
-                    if (r < 0.54) "B33" else "B75"
+                ActionType.BET -> when {
+                    a.allIn -> "A"
+                    a.street != Street.FLOP -> "B"
+                    a.amount > pot * 1.2 -> return null
+                    a.amount < pot * 0.54 -> "B33"
+                    else -> "B75"
                 }
-                ActionType.RAISE -> if (a.allIn) return null else "R"
+                ActionType.RAISE -> if (a.allIn) "A" else "R"
                 else -> return null
             }
             pot += a.amount
         }
-        val node = FlopGto.node("srp", engine.board, labels.joinToString("-")) ?: return null
-        val heroIp = seat == raiser
-        if (node.player != (if (heroIp) 1 else 0)) return null
-        // ranges the solve used: the raiser's opening range, and the big blind's flat-calling range
-        val w = preflopRanges(engine).getValue(raiser).hi
-        val range = if (heroIp) RangeEstimate(0.0, w)
-            else if (seat == engine.bigBlindSeat) RangeEstimate(w * 0.30, min(0.75, w * 1.9 + 0.08))
-            else preflopRanges(engine).getValue(seat)
+        val board = engine.board
+        val flop = board.take(3)
+        val line = lines.map { it.joinToString("-") }
+        fun closed(l: List<String>) = l.lastOrNull() == "C" || l == listOf("X", "X")
+        fun kind(l: List<String>) = if (l.lastOrNull() == "C") "b" else "x"
+        val cls = FlopTexture.key(flop)
+        // a turn or river card class the solved flops of this texture never produced falls back
+        // to the blank-card solution
+        fun keyFor(card: Char) = when (engine.street) {
+            Street.FLOP -> "$spot/$cls/F/${line[0]}"
+            Street.TURN -> "$spot/$cls/T/${line[0]}/$card/${line[1]}"
+            else -> "$spot/R/${FlopTexture.family(flop)}/${kind(lines[0])}${kind(lines[1])}/$card/${line[2]}"
+        }
+        val card = when (engine.street) {
+            Street.FLOP -> 'B'
+            Street.TURN -> if (closed(lines[0])) FlopTexture.cardClass(flop, board[3]) else return null
+            Street.RIVER -> if (closed(lines[0]) && closed(lines[1])) FlopTexture.cardClass(board.take(4), board[4]) else return null
+            else -> return null
+        }
+        val node = Gto.node(keyFor(card)) ?: Gto.node(keyFor('B')) ?: return null
+        val heroOop = seat == oop
+        if (node.player != (if (heroOop) 0 else 1)) return null
+        val range = if (heroOop) oopRange else ipRange
         val me = engine.player(seat)
-        val b = FlopTexture.bucket(me.hole, engine.board, range.lo, range.hi)
+        val b = FlopTexture.bucket(me.hole, board, range.lo, range.hi)
+        val betFraction = when (engine.street) { Street.TURN -> 0.66; else -> 0.75 }
         val opts = ArrayList<Pair<Move, Double>>()
         node.actions.forEachIndexed { i, act ->
-            val p = node.freq[b][i] / 100.0
             val move = when (act) {
-                "X" -> if (la.canCheck) Move.CHECK else Move.FOLD
-                "F" -> if (la.canCheck) Move.CHECK else Move.FOLD
+                "X", "F" -> if (la.canCheck) Move.CHECK else Move.FOLD
                 "C" -> if (la.canCall) Move.CALL else Move.CHECK
                 "B33" -> if (la.canRaise) raiseMove(la, (la.pot * 0.33).toInt().coerceAtLeast(engine.bigBlind)) else passiveMove(la)
                 "B75" -> if (la.canRaise) raiseMove(la, (la.pot * 0.75).toInt().coerceAtLeast(engine.bigBlind)) else passiveMove(la)
+                "B" -> if (la.canRaise) raiseMove(la, (la.pot * betFraction).toInt().coerceAtLeast(engine.bigBlind)) else passiveMove(la)
                 "R" -> if (la.canRaise) raiseMove(la, la.currentBet * 3) else if (la.canCall) Move.CALL else Move.CHECK
                 "A" -> if (la.canRaise) Move.raiseTo(la.maxRaiseTo) else if (la.canCall) Move.CALL else Move.CHECK
                 else -> return null
             }
-            opts += move to p
+            opts += move to node.freq[b][i]
         }
         val potOdds = if (la.toCall == 0) 0.0 else la.toCall.toDouble() / (la.pot + la.toCall)
         return Policy(normalized(opts), eq, potOdds, null)
@@ -684,7 +725,7 @@ object Bot {
         val prevStreet = Street.entries[street.ordinal - 1]
         val prevAggressor = engine.actions.lastOrNull { it.street == prevStreet && it.type.isAggressive }?.seat
         val initiative = prevAggressor == seat
-        if (style == BotStyle.GTO && street == Street.FLOP) solvedFlop(engine, seat, la, eq)?.let { return it }
+        if (style == BotStyle.GTO) solvedPostflop(engine, seat, la, eq)?.let { return it }
         val opts = ArrayList<Pair<Move, Double>>()
         val multi = if (nOpp >= 2) 0.35 else 1.0
 
