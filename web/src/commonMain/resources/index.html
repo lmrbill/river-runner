@@ -24,20 +24,10 @@
         #loading b { color: #E6B54F; font-size: 18px; }
         #diag { font-size: 12px; line-height: 1.6; color: #6f7d75; max-width: 520px; word-break: break-all; }
         #diag .err { color: #F06A63; }
-        /* The app is laid out for landscape, as on Android: in portrait, ask to turn the phone
-           (under the loading screen, so download progress stays visible while loading). */
         /* the app draws into this; the overlays below stay outside it, so they can cover it */
         #app { position: fixed; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; }
-        #rotate { display: none; position: fixed; inset: 0; z-index: 900; background: #0C1310; color: #EEF1EA;
-                  flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center;
-                  font: 17px -apple-system, "PingFang SC", sans-serif; padding: 24px; box-sizing: border-box; }
-        #rotate small { color: #9DAAA2; font-size: 13px; line-height: 1.6; }
-        #rotate .phone { width: 46px; height: 78px; border: 3px solid #E6B54F; border-radius: 9px;
-                         animation: rr-turn 2.4s ease-in-out infinite; }
-        @keyframes rr-turn { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
-        /* shown only when turning the phone would help: a portrait window that fills the screen
-           (not split view on an unfolded phone or iPad, not a narrow desktop window; see fit()) */
-        html.rr-rotate #rotate { display: flex; }
+        /* Portrait phone: the app is turned a quarter to the right and drawn in landscape (see fit()) */
+        html.rr-turned #app { transform-origin: 0 0; }
     </style>
     <script>
         // Loading diagnostics: elapsed time, files being fetched, and any error, shown on the
@@ -238,18 +228,55 @@
                 var cs = getComputedStyle(document.getElementById("safe"));
                 var inset = function (side) { return parseFloat(cs["padding" + side]) || 0; };
                 var l = Math.min(inset("Left"), 50), r = Math.min(inset("Right"), 50), t = inset("Top");
-                app.style.left = Math.round(x + l) + "px";
-                app.style.top = Math.round(y + t) + "px";
-                app.style.width = Math.max(0, Math.round(w - l - r)) + "px";
-                app.style.height = Math.max(0, Math.round(h - t)) + "px";
-                // Ask to turn the phone only when the window is portrait and fills (nearly) the
-                // whole screen. In split view a tall narrow window is normal and turning the device
+                var left = Math.round(x + l), top = Math.round(y + t);
+                var width = Math.max(0, Math.round(w - l - r)), height = Math.max(0, Math.round(h - t));
+                // A phone held upright: draw the app in landscape, turned a quarter to the right, so
+                // it plays sideways without asking. Only when the portrait window fills (nearly) the
+                // whole screen: in split view a tall narrow window is normal and turning the device
                 // does not change it, so the app is shown as a landscape strip instead (WebApp.kt).
                 var sShort = Math.min(screen.width, screen.height), sLong = Math.max(screen.width, screen.height);
                 var fullScreen = window.innerWidth >= sShort * 0.9 && window.innerHeight >= sLong * 0.7;
                 var touch = navigator.maxTouchPoints > 0;
-                document.documentElement.classList.toggle("rr-rotate", touch && fullScreen && window.innerHeight > window.innerWidth);
+                turned = touch && fullScreen && window.innerHeight > window.innerWidth;
+                document.documentElement.classList.toggle("rr-turned", turned);
+                app.style.left = left + "px";
+                app.style.top = top + "px";
+                if (turned) {
+                    // the element is landscape (height x width) and the transform stands it upright
+                    app.style.width = height + "px";
+                    app.style.height = width + "px";
+                    app.style.transform = "translateX(" + width + "px) rotate(90deg)";
+                } else {
+                    app.style.width = width + "px";
+                    app.style.height = height + "px";
+                    app.style.transform = "";
+                }
             }
+            // Compose reads a touch as (clientX, clientY) minus the canvas's top-left corner, which
+            // is wrong once the app is turned. Before it sees a touch, its coordinates are replaced
+            // by the matching point of the unturned app: a point (u, v) of the app appears on
+            // screen at (width - v, u) from the turned box's corner.
+            var turned = false;
+            function mapTouches(e) {
+                if (!turned || typeof Touch === "undefined") return;
+                var dx = Object.getOwnPropertyDescriptor(Touch.prototype, "clientX");
+                var dy = Object.getOwnPropertyDescriptor(Touch.prototype, "clientY");
+                if (!dx || !dy || !dx.get || !dy.get) return;
+                var gx = dx.get, gy = dy.get;
+                var rect = (app.querySelector("canvas") || app).getBoundingClientRect();
+                [e.touches, e.targetTouches, e.changedTouches].forEach(function (list) {
+                    if (!list) return;
+                    for (var i = 0; i < list.length; i++) {
+                        var t = list[i], cx = gx.call(t), cy = gy.call(t);
+                        var u = cy - rect.top, v = rect.right - cx;
+                        Object.defineProperty(t, "clientX", { value: rect.left + u, configurable: true });
+                        Object.defineProperty(t, "clientY", { value: rect.top + v, configurable: true });
+                    }
+                });
+            }
+            ["touchstart", "touchmove", "touchend", "touchcancel"].forEach(function (type) {
+                window.addEventListener(type, mapTouches, { capture: true, passive: true });
+            });
             if (vv) { vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); }
             window.addEventListener("resize", fit);
             window.addEventListener("orientationchange", function () { fit(); setTimeout(fit, 300); setTimeout(fit, 800); });
@@ -261,11 +288,6 @@
             fit();
         })();
     </script>
-    <div id="rotate">
-        <div class="phone"></div>
-        <div>请把手机横过来使用</div>
-        <small>Turn your phone sideways<br>如果转不过来，请在控制中心关闭“竖排方向锁定”</small>
-    </div>
     <div id="loading">
         <b>River Runner 加载中…</b>
         <div>已等待 <span id="secs">0</span> 秒，第一次打开需要下载约 5 MB，之后可以离线使用</div>
