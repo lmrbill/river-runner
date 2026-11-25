@@ -14,7 +14,7 @@ private fun rrReady(): Unit = js("window.__rrReady && window.__rrReady()")
 fun main() {
     rrLog("应用代码已启动（JS）")
     try {
-        // draws into <div id="app">; the loading screen and the rotate prompt sit next to it (index.html)
+        // draws into <div id="app">; the loading screen sits next to it, and index.html turns it in portrait
         ComposeViewport(document.getElementById("app")!!) { WebApp(onFirstFrame = ::rrReady) }
         rrLog("界面已创建，等待第一帧…")
     } catch (e: Throwable) {
