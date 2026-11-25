@@ -30,6 +30,14 @@ interface Platform {
     val textPrompt: ((String, String) -> String?)? get() = null
     /** Address the app is running from (the web page), or null on Android. Shown in Settings. */
     val pageUrl: String? get() = null
+    /**
+     * Opens the page's "export saves" panel (a backup file of every save slot and setting), or
+     * null when the platform has none. Settings shows a button for it. Set by the web app when
+     * its page provides one.
+     */
+    val exportSaves: (() -> Unit)? get() = null
+    /** Opens the page's "import saves" panel, or null when the platform has none (see [exportSaves]). */
+    val importSaves: (() -> Unit)? get() = null
 }
 
 interface Settings {

@@ -11,6 +11,7 @@ the GitHub release notes; the in-app "What's new" reads this file too.
 ## 0.8 · 2026-11-25
 
 ### 新增 | Added
+- 网页版：设置页可以“导出存档”，把所有存档和设置存成一个备份文件，可以导入到 Claude 页面版 | Web: Settings has "Export saves", which puts every save slot and setting in one backup file you can import into the Claude page version
 - 设置页显示版本号、构建的提交和日期，网页版还显示当前网址，方便确认打开的是哪个版本 | Settings shows the version, the commit and date it was built from, and on the web the page address, so you can tell which build you opened
 
 ### 改进 | Changed

@@ -19,3 +19,8 @@ private fun jsPrompt(t: String, i: String): String? = js("(function(){ try { ret
 internal actual fun browserPrompt(title: String, initial: String): String? = jsPrompt(title, initial)
 private fun jsPageUrl(): String = js("(function(){ try { return location.origin + location.pathname; } catch (e) { return ''; } })()")
 internal actual fun browserPageUrl(): String = jsPageUrl()
+
+private fun jsHasHook(n: String): Boolean = js("(function(){ try { return typeof window[n] === 'function'; } catch (e) { return false; } })()")
+private fun jsCallHook(n: String): Unit = js("(function(){ try { window[n](); } catch (e) {} })()")
+internal actual fun browserHasHook(name: String): Boolean = jsHasHook(name)
+internal actual fun browserCallHook(name: String) = jsCallHook(name)

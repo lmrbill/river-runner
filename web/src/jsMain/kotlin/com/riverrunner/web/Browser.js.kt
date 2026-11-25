@@ -23,3 +23,10 @@ internal actual fun browserPrompt(title: String, initial: String): String? =
 
 internal actual fun browserPageUrl(): String =
     js("(function(){ try { return location.origin + location.pathname; } catch (e) { return ''; } })()") as String
+
+internal actual fun browserHasHook(name: String): Boolean =
+    js("(function(n){ try { return typeof window[n] === 'function'; } catch (e) { return false; } })")(name) as Boolean
+
+internal actual fun browserCallHook(name: String) {
+    js("(function(n){ try { window[n](); } catch (e) {} })")(name)
+}

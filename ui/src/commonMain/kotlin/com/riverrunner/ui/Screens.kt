@@ -686,6 +686,15 @@ fun SettingsScreen(vm: AppViewModel) {
                 vm.platform.pageUrl?.takeIf { it.isNotEmpty() }?.let { Text(it, color = Palette.TextDim, fontSize = 12.sp) }
                 Spacer(Modifier.height(6.dp))
                 SmallButton(st.whatsNew, { vm.showChangelog() })
+                val exportFn = vm.platform.exportSaves
+                val importFn = vm.platform.importSaves
+                if (exportFn != null || importFn != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        exportFn?.let { SmallButton(st.exportSaves, it) }
+                        importFn?.let { SmallButton(st.importSaves, it) }
+                    }
+                }
             }
         }
     }
