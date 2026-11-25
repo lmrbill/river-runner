@@ -17,3 +17,5 @@ internal actual fun playAudio(url: String, volume: Double, rate: Double) = jsPla
 
 private fun jsPrompt(t: String, i: String): String? = js("(function(){ try { return window.prompt(t, i); } catch (e) { return null; } })()")
 internal actual fun browserPrompt(title: String, initial: String): String? = jsPrompt(title, initial)
+private fun jsPageUrl(): String = js("(function(){ try { return location.origin + location.pathname; } catch (e) { return ''; } })()")
+internal actual fun browserPageUrl(): String = jsPageUrl()

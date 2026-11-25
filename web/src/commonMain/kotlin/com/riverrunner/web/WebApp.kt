@@ -44,6 +44,8 @@ internal expect fun browserLanguage(): String
 internal expect fun playAudio(url: String, volume: Double, rate: Double)
 /** window.prompt: the entered text, or null when cancelled. */
 internal expect fun browserPrompt(title: String, initial: String): String?
+/** The page's address without query or fragment. */
+internal expect fun browserPageUrl(): String
 
 /** The whole app, as on Android. [onFirstFrame] runs once the first frame is on screen. */
 @Composable
@@ -101,10 +103,11 @@ internal object WebPlatform : Platform {
     override val settings: Settings = StorageSettings
     override val files: TextFiles = StorageFiles
     override val sound: SoundOut = AudioSound
-    override val appVersion: String = BuildInfo.VERSION
+    override val appVersion: String = "${BuildInfo.VERSION} (${BuildInfo.COMMIT}, ${BuildInfo.BUILD_DATE})"
     override val systemChinese: Boolean get() = browserLanguage().lowercase().startsWith("zh")
     override fun changelogText(): String = BuildInfo.CHANGELOG
     override val textPrompt: ((String, String) -> String?) = ::browserPrompt
+    override val pageUrl: String get() = browserPageUrl()
 }
 
 /** Settings as strings in localStorage ("rr.set.<key>"). */

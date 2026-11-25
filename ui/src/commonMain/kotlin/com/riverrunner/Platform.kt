@@ -28,6 +28,8 @@ interface Platform {
      * in iPhone Safari the canvas text field never brings up the keyboard.
      */
     val textPrompt: ((String, String) -> String?)? get() = null
+    /** Address the app is running from (the web page), or null on Android. Shown in Settings. */
+    val pageUrl: String? get() = null
 }
 
 interface Settings {

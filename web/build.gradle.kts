@@ -20,6 +20,10 @@ abstract class GenerateBuildInfo : DefaultTask() {
     @get:Input
     abstract val runNumber: Property<String>
 
+    /** Commit the site is built from (GITHUB_SHA in CI). */
+    @get:Input
+    abstract val commit: Property<String>
+
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
@@ -45,6 +49,8 @@ abstract class GenerateBuildInfo : DefaultTask() {
             "package com.riverrunner.web\n\n// Generated from CHANGELOG.md by web/build.gradle.kts\n" +
                 "internal object BuildInfo {\n" +
                 "    const val VERSION = " + literal(base + "." + runNumber.get()) + "\n" +
+                "    const val COMMIT = " + literal(commit.get().take(7)) + "\n" +
+                "    const val BUILD_DATE = " + literal(java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString()) + "\n" +
                 "    val CHANGELOG: String = " + literal(text) + "\n}\n"
         )
     }
@@ -53,6 +59,7 @@ abstract class GenerateBuildInfo : DefaultTask() {
 val generateBuildInfo = tasks.register<GenerateBuildInfo>("generateBuildInfo") {
     changelog.set(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
     runNumber.set(providers.environmentVariable("GITHUB_RUN_NUMBER").orElse("0"))
+    commit.set(providers.environmentVariable("GITHUB_SHA").orElse("local"))
     outputDir.set(layout.buildDirectory.dir("generated/buildInfo"))
 }
 
