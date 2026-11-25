@@ -118,6 +118,25 @@ object Bot {
 
     // ------------------------------------------------------------------ helpers
 
+    /**
+     * Stack depth to look up in the no-ante [PushFoldNash] table. Antes add dead money, which
+     * plays like a shorter stack: the stack is measured in units of the starting pot (1.5 bb).
+     */
+    fun nashStack(engine: HandEngine, effBB: Double): Double {
+        val startPot = 1.5 + engine.setup.ante.toDouble() * engine.order.size / engine.bigBlind
+        return effBB * 1.5 / startPot
+    }
+
+    /** True when [seat] is the big blind, everyone else folded, and the small blind shoved. */
+    private fun facingSmallBlindShove(engine: HandEngine, seat: Int, acts: List<Action>): Boolean {
+        if (seat != engine.bigBlindSeat) return false
+        val live = engine.players.filter { !it.folded }
+        if (live.size != 2 || live.none { it.seat == engine.smallBlindSeat }) return false
+        val sb = engine.player(engine.smallBlindSeat)
+        val voluntary = acts.filter { it.type != ActionType.FOLD }
+        return sb.allIn && voluntary.size == 1 && voluntary[0].seat == sb.seat && voluntary[0].type.isAggressive
+    }
+
     private fun smooth(x: Double, threshold: Double, band: Double): Double =
         1.0 / (1.0 + exp((x - threshold) / band))   // 1 when x << threshold
 
@@ -162,7 +181,9 @@ object Bot {
                 ActionType.BET, ActionType.RAISE -> {
                     val stackBB = (engine.player(a.seat).startStack) / bb
                     val w = when (raises) {
-                        0 -> if (a.allIn && stackBB <= 15) pushWidth(stackBB, behind)
+                        0 -> if (a.allIn && stackBB <= 15 && behind == 1 && limpers == 0)
+                                 PushFoldNash.pushFraction(nashStack(engine, stackBB))
+                             else if (a.allIn && stackBB <= 15) pushWidth(stackBB, behind)
                              else if (limpers > 0) rfiWidth(behind, hu) * 0.65
                              else rfiWidth(behind, hu)
                         1 -> if (a.allIn && stackBB <= 20) max(0.06, lastRaiserWidth * 0.5)
@@ -440,6 +461,14 @@ object Bot {
         // ---- big calls (facing a shove or a raise that commits a large part of the stack)
         if (la.toCall > 0 && (la.toCall >= me.stack * 0.4 || engine.players.any { it.allIn && !it.folded && it.seat != seat && it.streetBet >= la.currentBet })) {
             val opps = engine.players.filter { !it.folded && it.seat != seat }
+            if (style == BotStyle.GTO && t == null && facingSmallBlindShove(engine, seat, acts)) {
+                // big blind vs a small-blind shove: solved Nash calling range (chip EV, so not in tournaments)
+                val limit = PushFoldNash.callUpTo(HandClasses.className(me.hole[0], me.hole[1]))
+                val pCall = above(limit, nashStack(engine, effBB), 0.15)
+                opts += Move.CALL to pCall
+                opts += Move.FOLD to (1 - pCall)
+                return Policy(normalized(opts), null, la.toCall.toDouble() / (la.pot + la.toCall), null)
+            }
             val samplers = opps.map { samplerFor(engine, it.seat, ranges.getValue(it.seat)) }
             val eq = Equity.vsRanges(me.hole, emptyList(), samplers, 500, random)
             val (req, icm) = requiredEquity(engine, seat, la, t)
@@ -465,6 +494,14 @@ object Bot {
                 return Policy(normalized(opts), null, 0.0, null)
             }
             if (effBB <= 13 && t != null || effBB <= 10) {
+                if (behind == 1 && limpers == 0) {
+                    // small blind vs big blind (or heads-up): solved push/fold Nash ranges
+                    val limit = PushFoldNash.pushUpTo(HandClasses.className(me.hole[0], me.hole[1])) * style.looseness
+                    val pJam = above(limit, nashStack(engine, effBB), 0.15)
+                    opts += Move.raiseTo(la.maxRaiseTo) to pJam
+                    opts += Move.FOLD to (1 - pJam)
+                    return Policy(normalized(opts), null, 0.0, null)
+                }
                 val w = pushWidth(effBB, behind) * (if (hu) 1.07 else 1.0) * style.looseness
                 val pJam = smooth(pct, w, 0.012)
                 opts += Move.raiseTo(la.maxRaiseTo) to pJam
@@ -560,6 +597,73 @@ object Bot {
         return Policy(normalized(opts), null, potOdds, null)
     }
 
+    /**
+     * Flop play from solved data ([FlopGto]) for a heads-up single-raised pot where the preflop
+     * raiser is in position and stacks are deep. Null when the spot is not covered, so the
+     * caller falls back to the rule-based play.
+     */
+    private fun solvedFlop(engine: HandEngine, seat: Int, la: LegalActions, eq: Double): Policy? {
+        val live = engine.players.filter { !it.folded }
+        if (live.size != 2 || live.any { it.allIn }) return null
+        val pre = engine.actions.filter { it.street == Street.PREFLOP && !it.type.isPost }
+        val raises = pre.filter { it.type.isAggressive }
+        if (raises.size != 1) return null
+        val raiser = raises[0].seat
+        val caller = live.first { it.seat != raiser }.seat
+        if (live.none { it.seat == raiser }) return null
+        val order = engine.order
+        if (order.indexOf(raiser) < order.indexOf(caller)) return null   // solved with the raiser in position
+        // pot and stacks when the flop came
+        val potStart = engine.actions.filter { it.street == Street.PREFLOP }.sumOf { it.amount }
+        val flopActs = engine.actions.filter { it.street == Street.FLOP }
+        val stackAtFlop = live.minOf { it.stack + flopActs.filter { a -> a.seat == it.seat }.sumOf { a -> a.amount } }
+        if (stackAtFlop < potStart * 6) return null
+        // the flop action so far, in the solver's labels
+        var pot = potStart
+        val labels = ArrayList<String>()
+        for (a in flopActs) {
+            labels += when (a.type) {
+                ActionType.CHECK -> "X"
+                ActionType.CALL -> "C"
+                ActionType.BET -> {
+                    val r = a.amount.toDouble() / pot
+                    if (a.allIn || r > 1.2) return null
+                    if (r < 0.54) "B33" else "B75"
+                }
+                ActionType.RAISE -> if (a.allIn) return null else "R"
+                else -> return null
+            }
+            pot += a.amount
+        }
+        val node = FlopGto.node("srp", engine.board, labels.joinToString("-")) ?: return null
+        val heroIp = seat == raiser
+        if (node.player != (if (heroIp) 1 else 0)) return null
+        // ranges the solve used: the raiser's opening range, and the big blind's flat-calling range
+        val w = preflopRanges(engine).getValue(raiser).hi
+        val range = if (heroIp) RangeEstimate(0.0, w)
+            else if (seat == engine.bigBlindSeat) RangeEstimate(w * 0.30, min(0.75, w * 1.9 + 0.08))
+            else preflopRanges(engine).getValue(seat)
+        val me = engine.player(seat)
+        val b = FlopTexture.bucket(me.hole, engine.board, range.lo, range.hi)
+        val opts = ArrayList<Pair<Move, Double>>()
+        node.actions.forEachIndexed { i, act ->
+            val p = node.freq[b][i] / 100.0
+            val move = when (act) {
+                "X" -> if (la.canCheck) Move.CHECK else Move.FOLD
+                "F" -> if (la.canCheck) Move.CHECK else Move.FOLD
+                "C" -> if (la.canCall) Move.CALL else Move.CHECK
+                "B33" -> if (la.canRaise) raiseMove(la, (la.pot * 0.33).toInt().coerceAtLeast(engine.bigBlind)) else passiveMove(la)
+                "B75" -> if (la.canRaise) raiseMove(la, (la.pot * 0.75).toInt().coerceAtLeast(engine.bigBlind)) else passiveMove(la)
+                "R" -> if (la.canRaise) raiseMove(la, la.currentBet * 3) else if (la.canCall) Move.CALL else Move.CHECK
+                "A" -> if (la.canRaise) Move.raiseTo(la.maxRaiseTo) else if (la.canCall) Move.CALL else Move.CHECK
+                else -> return null
+            }
+            opts += move to p
+        }
+        val potOdds = if (la.toCall == 0) 0.0 else la.toCall.toDouble() / (la.pot + la.toCall)
+        return Policy(normalized(opts), eq, potOdds, null)
+    }
+
     private fun postflop(engine: HandEngine, seat: Int, style: BotStyle, la: LegalActions, random: Random, t: TournamentContext?): Policy {
         val me = engine.player(seat)
         val board = engine.board
@@ -580,6 +684,7 @@ object Bot {
         val prevStreet = Street.entries[street.ordinal - 1]
         val prevAggressor = engine.actions.lastOrNull { it.street == prevStreet && it.type.isAggressive }?.seat
         val initiative = prevAggressor == seat
+        if (style == BotStyle.GTO && street == Street.FLOP) solvedFlop(engine, seat, la, eq)?.let { return it }
         val opts = ArrayList<Pair<Move, Double>>()
         val multi = if (nOpp >= 2) 0.35 else 1.0
 

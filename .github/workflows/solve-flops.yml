@@ -1,0 +1,63 @@
+name: Solve flops
+
+# Runs the offline flop solver (tools/flop-solve) on every flop in flops.txt, spread over
+# parallel jobs, and pushes the JSON results to the gto-data branch. Not part of the app build:
+# it only runs when the solver or its flop list changes on the gto-upgrade branch, or by hand.
+on:
+  push:
+    branches: [ gto-upgrade ]
+    paths: [ 'tools/flop-solve/**', '.github/workflows/solve-flops.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  solve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build solver
+        working-directory: tools/flop-solve
+        env:
+          # postflop-solver trips lints that newer compilers made errors
+          RUSTFLAGS: --cap-lints=warn -C target-cpu=native
+        run: cargo build --release
+      - name: Solve this job's share of the flops
+        working-directory: tools/flop-solve
+        run: |
+          mkdir -p out
+          awk -v p=${{ matrix.part }} '(NR - 1) % 20 == p' flops.txt | while read -r cls flop; do
+            ./target/release/rr-flop-solve srp "$flop" 300 1.0 > "out/srp-$flop.json"
+          done
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solved-${{ matrix.part }}
+          path: tools/flop-solve/out/*.json
+
+  publish:
+    needs: solve
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: solved-*
+          path: /tmp/solved
+          merge-multiple: true
+      - name: Push results to the gto-data branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd /tmp/solved
+          ls | wc -l
+          echo "${GITHUB_SHA}" > COMMIT
+          git init -q && git checkout -q -b gto-data && git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "Solved flops for ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gto-data

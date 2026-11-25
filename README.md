@@ -126,6 +126,11 @@ True GTO solutions only exist for heads-up play; no one can solve 5–8 handed g
 - **Short stacks** — Nash-style push/fold widths by stack depth and players left to act; calls against all-ins compare equity vs. the shover's range to pot odds — or to **ICM** required equity in tournaments.
 - **Postflop** — Monte Carlo equity against each opponent's range (narrowed by their actions), board-texture-based bet sizing, value/bluff frequencies, pot odds with equity realisation, and minimum-defence guards.
 
+**In this fork, two parts use real solver output** (see [`tools/`](tools/flop-solve/README.md)):
+
+- **Short-stack push/fold, small blind vs big blind** — an exact heads-up Nash equilibrium computed from a 169×169 all-in equity table (`tools/gto`, `PushFoldNash.kt`).
+- **Flop play in heads-up single-raised pots with the raiser in position** — solved with postflop-solver on 98 representative flops covering 49 board textures, stored as action frequencies by hand-strength bucket (`tools/flop-solve`, `FlopGtoData.kt`). Turn, river, multiway and 3-bet pots still use the approximation above.
+
 Styles (TAG, LAG, station, nit, maniac) shift range widths, aggression, bluffing and call-down thresholds, so a mixed table has exploitable opponents.
 
 真正的 GTO 只对单挑存在可靠解，多人局使用近似解：翻前按位置的范围表 + 混合策略；短筹码使用推/弃与 ICM；翻后根据对手范围的蒙特卡洛胜率、牌面结构、底池赔率做混合决策。
