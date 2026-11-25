@@ -22,6 +22,12 @@ interface Platform {
     val systemChinese: Boolean
     /** CHANGELOG.md of this build, or "" when it is not available. */
     fun changelogText(): String
+    /**
+     * A native text prompt (title, initial text) -> entered text, or null when cancelled.
+     * Null when the platform has none and the app's own text field works. The web app sets it:
+     * in iPhone Safari the canvas text field never brings up the keyboard.
+     */
+    val textPrompt: ((String, String) -> String?)? get() = null
 }
 
 interface Settings {

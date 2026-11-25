@@ -17,3 +17,6 @@ internal actual fun browserLanguage(): String = js("navigator.language || ''") a
 internal actual fun playAudio(url: String, volume: Double, rate: Double) {
     js("(function(u, v, r){ try { var a = new Audio(u); a.volume = v; a.playbackRate = r; var p = a.play(); if (p && p.catch) p.catch(function(){}); } catch (e) {} })")(url, volume, rate)
 }
+
+internal actual fun browserPrompt(title: String, initial: String): String? =
+    js("(function(t, i){ try { return window.prompt(t, i); } catch (e) { return null; } })")(title, initial) as String?
