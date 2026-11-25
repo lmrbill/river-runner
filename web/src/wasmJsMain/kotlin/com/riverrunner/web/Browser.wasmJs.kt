@@ -14,3 +14,6 @@ internal actual fun storageSet(key: String, value: String): Boolean = jsStorageS
 internal actual fun storageRemove(key: String) = jsStorageRemove(key)
 internal actual fun browserLanguage(): String = jsLanguage()
 internal actual fun playAudio(url: String, volume: Double, rate: Double) = jsPlay(url, volume, rate)
+
+private fun jsPrompt(t: String, i: String): String? = js("(function(){ try { return window.prompt(t, i); } catch (e) { return null; } })()")
+internal actual fun browserPrompt(title: String, initial: String): String? = jsPrompt(title, initial)

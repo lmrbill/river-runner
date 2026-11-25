@@ -42,6 +42,8 @@ internal expect fun storageSet(key: String, value: String): Boolean
 internal expect fun storageRemove(key: String)
 internal expect fun browserLanguage(): String
 internal expect fun playAudio(url: String, volume: Double, rate: Double)
+/** window.prompt: the entered text, or null when cancelled. */
+internal expect fun browserPrompt(title: String, initial: String): String?
 
 /** The whole app, as on Android. [onFirstFrame] runs once the first frame is on screen. */
 @Composable
@@ -102,6 +104,7 @@ internal object WebPlatform : Platform {
     override val appVersion: String = BuildInfo.VERSION
     override val systemChinese: Boolean get() = browserLanguage().lowercase().startsWith("zh")
     override fun changelogText(): String = BuildInfo.CHANGELOG
+    override val textPrompt: ((String, String) -> String?) = ::browserPrompt
 }
 
 /** Settings as strings in localStorage ("rr.set.<key>"). */

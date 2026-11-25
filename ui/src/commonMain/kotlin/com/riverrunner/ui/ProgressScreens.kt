@@ -284,6 +284,7 @@ fun SavesScreen(vm: AppViewModel) {
         onCreate = { vm.createProfile(it) },
         onRename = vm::renameProfile,
         onDelete = vm::deleteProfile,
+        textPrompt = vm.platform.textPrompt,
     )
 }
 
@@ -298,9 +299,18 @@ fun SavesContent(
     onCreate: (String) -> Unit,
     onRename: (String, String) -> Unit,
     onDelete: (String) -> Unit,
+    /** When set, names are typed in this native prompt instead of the dialog (see Platform.textPrompt). */
+    textPrompt: ((String, String) -> String?)? = null,
 ) {
     val st = LocalStrings.current
     var naming by remember { mutableStateOf<Pair<String?, String>?>(null) }  // (id or null for new, initial name)
+    // id null = new save
+    fun askName(id: String?, initial: String) {
+        if (textPrompt == null) { naming = id to initial; return }
+        val name = textPrompt(st.saveName, initial)?.trim()?.take(12)
+        if (name.isNullOrBlank()) return
+        if (id == null) onCreate(name) else onRename(id, name)
+    }
     var deleting by remember { mutableStateOf<Profile?>(null) }
     Column(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -310,7 +320,7 @@ fun SavesContent(
             Spacer(Modifier.weight(1f))
             val full = profiles.size >= maxSlots
             if (full) Text(st.slotsFull(maxSlots), color = Palette.TextDim, fontSize = 12.sp)
-            else ActionButton("+ " + st.newSave, Palette.AccentDim, modifier = Modifier.height(40.dp)) { naming = null to defaultName }
+            else ActionButton("+ " + st.newSave, Palette.AccentDim, modifier = Modifier.height(40.dp)) { askName(null, defaultName) }
         }
         Spacer(Modifier.height(10.dp))
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -319,7 +329,7 @@ fun SavesContent(
                     row.forEach { p ->
                         SaveCard(
                             p, p.id == activeId, Modifier.weight(1f),
-                            onUse = { onUse(p.id) }, onRename = { naming = p.id to p.name }, onDelete = { deleting = p },
+                            onUse = { onUse(p.id) }, onRename = { askName(p.id, p.name) }, onDelete = { deleting = p },
                         )
                     }
                     if (row.size == 1) Spacer(Modifier.weight(1f))
