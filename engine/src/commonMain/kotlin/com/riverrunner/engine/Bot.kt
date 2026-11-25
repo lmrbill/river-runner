@@ -118,6 +118,25 @@ object Bot {
 
     // ------------------------------------------------------------------ helpers
 
+    /**
+     * Stack depth to look up in the no-ante [PushFoldNash] table. Antes add dead money, which
+     * plays like a shorter stack: the stack is measured in units of the starting pot (1.5 bb).
+     */
+    fun nashStack(engine: HandEngine, effBB: Double): Double {
+        val startPot = 1.5 + engine.setup.ante.toDouble() * engine.order.size / engine.bigBlind
+        return effBB * 1.5 / startPot
+    }
+
+    /** True when [seat] is the big blind, everyone else folded, and the small blind shoved. */
+    private fun facingSmallBlindShove(engine: HandEngine, seat: Int, acts: List<Action>): Boolean {
+        if (seat != engine.bigBlindSeat) return false
+        val live = engine.players.filter { !it.folded }
+        if (live.size != 2 || live.none { it.seat == engine.smallBlindSeat }) return false
+        val sb = engine.player(engine.smallBlindSeat)
+        val voluntary = acts.filter { it.type != ActionType.FOLD }
+        return sb.allIn && voluntary.size == 1 && voluntary[0].seat == sb.seat && voluntary[0].type.isAggressive
+    }
+
     private fun smooth(x: Double, threshold: Double, band: Double): Double =
         1.0 / (1.0 + exp((x - threshold) / band))   // 1 when x << threshold
 
@@ -162,7 +181,9 @@ object Bot {
                 ActionType.BET, ActionType.RAISE -> {
                     val stackBB = (engine.player(a.seat).startStack) / bb
                     val w = when (raises) {
-                        0 -> if (a.allIn && stackBB <= 15) pushWidth(stackBB, behind)
+                        0 -> if (a.allIn && stackBB <= 15 && behind == 1 && limpers == 0)
+                                 PushFoldNash.pushFraction(nashStack(engine, stackBB))
+                             else if (a.allIn && stackBB <= 15) pushWidth(stackBB, behind)
                              else if (limpers > 0) rfiWidth(behind, hu) * 0.65
                              else rfiWidth(behind, hu)
                         1 -> if (a.allIn && stackBB <= 20) max(0.06, lastRaiserWidth * 0.5)
@@ -440,6 +461,14 @@ object Bot {
         // ---- big calls (facing a shove or a raise that commits a large part of the stack)
         if (la.toCall > 0 && (la.toCall >= me.stack * 0.4 || engine.players.any { it.allIn && !it.folded && it.seat != seat && it.streetBet >= la.currentBet })) {
             val opps = engine.players.filter { !it.folded && it.seat != seat }
+            if (style == BotStyle.GTO && t == null && facingSmallBlindShove(engine, seat, acts)) {
+                // big blind vs a small-blind shove: solved Nash calling range (chip EV, so not in tournaments)
+                val limit = PushFoldNash.callUpTo(HandClasses.className(me.hole[0], me.hole[1]))
+                val pCall = above(limit, nashStack(engine, effBB), 0.15)
+                opts += Move.CALL to pCall
+                opts += Move.FOLD to (1 - pCall)
+                return Policy(normalized(opts), null, la.toCall.toDouble() / (la.pot + la.toCall), null)
+            }
             val samplers = opps.map { samplerFor(engine, it.seat, ranges.getValue(it.seat)) }
             val eq = Equity.vsRanges(me.hole, emptyList(), samplers, 500, random)
             val (req, icm) = requiredEquity(engine, seat, la, t)
@@ -465,6 +494,14 @@ object Bot {
                 return Policy(normalized(opts), null, 0.0, null)
             }
             if (effBB <= 13 && t != null || effBB <= 10) {
+                if (behind == 1 && limpers == 0) {
+                    // small blind vs big blind (or heads-up): solved push/fold Nash ranges
+                    val limit = PushFoldNash.pushUpTo(HandClasses.className(me.hole[0], me.hole[1])) * style.looseness
+                    val pJam = above(limit, nashStack(engine, effBB), 0.15)
+                    opts += Move.raiseTo(la.maxRaiseTo) to pJam
+                    opts += Move.FOLD to (1 - pJam)
+                    return Policy(normalized(opts), null, 0.0, null)
+                }
                 val w = pushWidth(effBB, behind) * (if (hu) 1.07 else 1.0) * style.looseness
                 val pJam = smooth(pct, w, 0.012)
                 opts += Move.raiseTo(la.maxRaiseTo) to pJam
