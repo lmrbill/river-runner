@@ -239,6 +239,14 @@
                 var touch = navigator.maxTouchPoints > 0;
                 turned = touch && fullScreen && window.innerHeight > window.innerWidth;
                 document.documentElement.classList.toggle("rr-turned", turned);
+                if (turned) {
+                    // Turned, the app's top row (back arrow, "New save") runs along the right edge
+                    // of the screen and its bottom along the left. In in-app browsers those edges
+                    // belong to back/forward swipes, which swallow taps that start there, and the
+                    // bottom edge belongs to the home indicator: keep the app clear of all three.
+                    var edge = 26, bottom = 22;
+                    left += edge; width = Math.max(0, width - 2 * edge); height = Math.max(0, height - bottom);
+                }
                 app.style.left = left + "px";
                 app.style.top = top + "px";
                 if (turned) {
