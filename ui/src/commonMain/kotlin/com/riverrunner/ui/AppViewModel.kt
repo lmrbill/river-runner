@@ -14,6 +14,8 @@ import com.riverrunner.engine.nowMillis
 import kotlin.math.roundToInt
 import com.riverrunner.data.HistoryStore
 import com.riverrunner.data.ProfileStore
+import com.riverrunner.data.SessionSaves
+import com.riverrunner.engine.SessionSnapshot
 import com.riverrunner.engine.AchievementDef
 import com.riverrunner.engine.BotStyle
 import com.riverrunner.engine.Deviation
@@ -71,6 +73,9 @@ class AppViewModel(val platform: Platform) : ViewModel() {
     var profile by mutableStateOf(profiles.active()); private set
     var profileList by mutableStateOf(profiles.all()); private set
     var history = HistoryStore(platform.files, profiles.historyFile(profile.id)); private set
+    private var sessionSaves = SessionSaves(platform.files, profiles.sessionFile(profile.id))
+    /** The slot's last session when it can still go on ("Continue last session"), else null. */
+    var resumable by mutableStateOf(sessionSaves.read()?.takeIf { it.playable }); private set
 
     /** Achievement just unlocked, shown as a toast over any screen. */
     var unlockToast by mutableStateOf<AchievementDef?>(null); private set
@@ -82,6 +87,8 @@ class AppViewModel(val platform: Platform) : ViewModel() {
         profiles.activate(id)
         profile = profiles.active()
         history = HistoryStore(platform.files, profiles.historyFile(profile.id))
+        sessionSaves = SessionSaves(platform.files, profiles.sessionFile(profile.id))
+        resumable = sessionSaves.read()?.takeIf { it.playable }
         profileList = profiles.all()
     }
 
@@ -269,10 +276,16 @@ class AppViewModel(val platform: Platform) : ViewModel() {
 
     private val botDelay: Long get() = when (prefs.speed) { 0 -> 1500L; 2 -> 450L; else -> 900L }
 
-    fun startGame(config: SessionConfig) {
+    /** Picks the last session up where it stopped: same seats, stacks, blind level and hand count. */
+    fun continueLastSession() {
+        val snap = resumable ?: return
+        startGame(snap.config.copy(seed = kotlin.random.Random.nextLong()), snap)
+    }
+
+    fun startGame(config: SessionConfig, resume: SessionSnapshot? = null) {
         gameJob?.cancel()
         lastConfig = config
-        val s = GameSession(config)
+        val s = GameSession(config, resume)
         session = s
         quitRequested = false
         reviewing = false
@@ -282,6 +295,13 @@ class AppViewModel(val platform: Platform) : ViewModel() {
         sessionRecords.clear()
         lastSessionRecord = null
         hudStats = emptyMap()
+        if (resume != null) {
+            // the hands played before, for the HUD and "replay last hand" (they are in History too)
+            val byId = history.all().associateBy { it.id }
+            resume.handIds.mapNotNullTo(sessionRecords) { byId[it] }
+            lastSessionRecord = sessionRecords.lastOrNull()
+            hudStats = s.players.filter { !it.isHuman }.associate { it.seat to SeatStatsCalc.forSeat(sessionRecords, it.seat) }
+        }
         tally = DeviationTally()
         handVerdicts.clear()
         feedback = null
@@ -514,6 +534,10 @@ class AppViewModel(val platform: Platform) : ViewModel() {
             lastRecordId = rec.id
             sessionRecords += rec
             lastSessionRecord = rec
+            // where the session stands now, so it can be continued later; a finished one can't be
+            val saves = sessionSaves
+            val snap = if (s.isOver) null else s.snapshot(sessionRecords.takeLast(300).map { it.id })
+            withContext(IoDispatcher) { if (snap == null) saves.clear() else saves.write(snap) }
             hudStats = s.players.filter { !it.isHuman }.associate { it.seat to SeatStatsCalc.forSeat(sessionRecords, it.seat) }
             if (handVerdicts.isNotEmpty()) {
                 val pos = Stats.positionOf(rec)
@@ -562,6 +586,7 @@ class AppViewModel(val platform: Platform) : ViewModel() {
         handOver = null
         peeking = false
         reviewing = false
+        resumable = sessionSaves.read()?.takeIf { it.playable }
         screen = Screen.Result(summary)
     }
 

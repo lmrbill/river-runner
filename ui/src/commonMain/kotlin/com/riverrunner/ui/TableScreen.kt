@@ -365,7 +365,7 @@ private fun FeedbackCard(f: DecisionFeedback, fmt: (Int) -> String) {
 }
 
 @Composable
-private fun RoundIcon(text: String, label: String, onClick: () -> Unit) {
+internal fun RoundIcon(text: String, label: String, onClick: () -> Unit) {
     Box(
         Modifier.size(34.dp).pressable(onClick = onClick).clip(CircleShape).background(Palette.PanelHi)
             .semantics { contentDescription = label; role = Role.Button },

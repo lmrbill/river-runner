@@ -396,8 +396,7 @@ class RecordTest {
 }
 
 class SessionTest {
-    private fun playOut(cfg: SessionConfig, maxHands: Int): GameSession {
-        val s = GameSession(cfg)
+    private fun playOut(cfg: SessionConfig, maxHands: Int, s: GameSession = GameSession(cfg)): GameSession {
         val rnd = Random(cfg.seed)
         val total = s.players.sumOf { it.stack }
         var hands = 0
@@ -423,6 +422,25 @@ class SessionTest {
             assertTrue(sum.heroPlace in 1..size)
             assertEquals((1..size).toList(), sum.standings.map { it.place }.sorted())
         }
+    }
+
+    @Test fun resumedSessionKeepsStacksLevelAndHandCount() {
+        val cfg = SessionConfig(GameMode.TOURNAMENT, 6, 30, TableType.MIXED, handsPerLevel = 4, seed = 21)
+        val first = playOut(cfg, 9)
+        val snap = first.snapshot(listOf(1L, 2L))
+        assertTrue(snap.playable)
+        val again = GameSession(cfg.copy(seed = 99), snap)
+        assertEquals(first.handNumber, again.handNumber)
+        assertEquals(first.currentLevel(), again.currentLevel())
+        assertEquals(first.buttonSeat, again.buttonSeat)
+        for (p in first.players) {
+            val q = again.players[p.seat]
+            assertEquals(p.name, q.name); assertEquals(p.style, q.style)
+            assertEquals(p.stack, q.stack); assertEquals(p.startStack, q.startStack); assertEquals(p.place, q.place)
+        }
+        // and it plays on from there, chips kept
+        playOut(cfg, 3, again)
+        assertTrue(again.handNumber > first.handNumber || again.isOver)
     }
 
     @Test fun cashSessionRuns() {

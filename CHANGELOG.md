@@ -11,10 +11,12 @@ the GitHub release notes; the in-app "What's new" reads this file too.
 ## 0.8 · 2026-11-25
 
 ### 新增 | Added
+- 首页“继续上次牌局”：从上次停下的地方接着打，筹码、盲注级别和手数都保留，上次的牌也还能复盘 | Home has "Continue last session": pick up where you stopped, with the same stacks, blind level and hand count, and that session's hands still there to review
 - 网页版：设置页可以“导出存档”，把所有存档和设置存成一个备份文件，可以导入到 Claude 页面版 | Web: Settings has "Export saves", which puts every save slot and setting in one backup file you can import into the Claude page version
 - 设置页显示版本号、构建的提交和日期，网页版还显示当前网址，方便确认打开的是哪个版本 | Settings shows the version, the commit and date it was built from, and on the web the page address, so you can tell which build you opened
 
 ### 改进 | Changed
+- 复盘：右侧面板变窄变紧凑，GTO 分析过长时在框内滚动，手机横屏时不再挡住牌桌和动作记录 | Replay: the side panel is narrower and more compact, and a long GTO analysis scrolls inside its box, so on a phone held sideways it no longer covers the table or the action log
 - 复盘：每一步动作都有 GTO 分析，不只是你的，电脑玩家的下注、过牌、跟注和弃牌也会显示 GTO 建议和是否偏离 | Replay: every action gets a GTO analysis, not just yours; the computer players' bets, checks, calls and folds also show the GTO suggestion and whether they deviated
 - 网页版：手机竖着拿时不再提示“请把手机横过来”，而是直接把牌桌横着显示 | Web: holding the phone upright no longer asks you to turn it; the table is shown sideways right away
 - GTO 机器人和复盘建议：短筹码小盲对大盲（以及单挑）改用求解出的推/弃纳什范围 | GTO bots and replay suggestions: short-stack small blind vs big blind (and heads-up) now uses solved push/fold Nash ranges

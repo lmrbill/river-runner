@@ -223,6 +223,10 @@ data class Strings(
     val newGame: String,
     val startGame: String,
     val quickStart: String,
+    /** picks the last session up where it stopped (stacks, blinds, hand count) */
+    val continueLast: String,
+    /** hands played, your stack, blind level (tournament only) */
+    val continueSummary: (Int, String, Int?) -> String,
     val stackLabelBB: String,
     val deckStyle: String,
     val deckFour: String,
@@ -474,6 +478,8 @@ val ZH = Strings(
     newGame = "新练习",
     startGame = "开始练习",
     quickStart = "按上次设置开始",
+    continueLast = "继续上次牌局",
+    continueSummary = { h, stack, lvl -> "已打 $h 手 · 你 $stack" + (lvl?.let { " · 盲注第 $it 级" } ?: "") },
     stackLabelBB = "起始筹码 (BB)",
     deckStyle = "牌面配色",
     deckFour = "四色",
@@ -722,6 +728,8 @@ val EN = Strings(
     newGame = "New practice",
     startGame = "Start practice",
     quickStart = "Practice last setup",
+    continueLast = "Continue last session",
+    continueSummary = { h, stack, lvl -> "$h hands played · you $stack" + (lvl?.let { " · level $it" } ?: "") },
     stackLabelBB = "Stack (BB)",
     deckStyle = "Card colours",
     deckFour = "4-colour",

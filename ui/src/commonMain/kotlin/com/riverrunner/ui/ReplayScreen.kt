@@ -4,6 +4,11 @@ import com.riverrunner.PlatformBackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -210,39 +215,47 @@ fun ReplayContent(
         Box(Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
             PokerTable(table, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = false)
         }
+        // same width as the table's own panel, and everything inside fits a phone held sideways:
+        // the GTO card scrolls within its share of the height and the action log takes the rest
         Column(
-            Modifier.width(240.dp).fillMaxHeight().background(Palette.Panel).padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.width(212.dp).fillMaxHeight().background(Palette.Panel).padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SmallButton("←", onBack)
-                Column(Modifier.weight(1f).padding(start = 6.dp)) {
+                RoundIcon("←", st.back, onBack)
+                Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
                     Text(
-                        "${st.replay} · ${st.handNo(record.handNumber)}", color = Palette.Text, fontSize = 15.sp,
+                        "${st.replay} · ${st.handNo(record.handNumber)}", color = Palette.Text, fontSize = 14.sp,
                         fontWeight = FontWeight.Bold, maxLines = 1,
                     )
                     Text(com.riverrunner.engine.Stats.positionOf(record), color = Palette.TextDim, fontSize = 11.sp, maxLines = 1)
                 }
+                RoundIcon(if (record.favorite) "★" else "☆", st.starHand, onStar)
             }
-            // starring is labelled and sits right under the title, so a hand is easy to find again in History
-            SmallButton(
-                (if (record.favorite) "★ " else "☆ ") + st.starHand, onStar, Modifier.fillMaxWidth(),
-                highlight = record.favorite,
-            )
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                 SmallButton("⏮", { idx = 0 }, Modifier.weight(1f))
                 SmallButton("◀", { if (idx > 0) idx-- }, Modifier.weight(1.3f))
                 SmallButton("▶", { if (idx < frames.size - 1) idx++ }, Modifier.weight(1.3f), highlight = true)
                 SmallButton("⏭", { idx = frames.size - 1 }, Modifier.weight(1f))
             }
-            if (decisionAction != null && decisionAction.seat == decisionSeat) {
-                val who = if (decisionSeat == record.heroSeat) null
-                    else record.players.firstOrNull { it.seat == decisionSeat }?.name
-                AnalysisCard(decisionAction, justTaken != null, who, policy, fmt)
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val room = maxHeight
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    if (decisionAction != null && decisionAction.seat == decisionSeat) {
+                        val who = if (decisionSeat == record.heroSeat) null
+                            else record.players.firstOrNull { it.seat == decisionSeat }?.name
+                        // at most about 60% of the room, scrolling inside when the advice is longer
+                        Box(Modifier.heightIn(max = room * 0.6f).verticalScroll(rememberScrollState())) {
+                            AnalysisCard(decisionAction, justTaken != null, who, policy, fmt)
+                        }
+                    }
+                    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                        if (maxHeight > 30.dp) ActionLog(log, Modifier.fillMaxSize(), highlightIndex = idx, onClick = { idx = it })
+                    }
+                }
             }
-            ActionLog(log, Modifier.weight(1f), highlightIndex = idx, onClick = { idx = it })
             if (onContinue != null) {
-                ActionButton(continueLabel ?: st.reviewNext, Palette.Gold, Modifier.fillMaxWidth(), textColor = Palette.Ink, onClick = onContinue)
+                ActionButton(continueLabel ?: st.reviewNext, Palette.Gold, Modifier.fillMaxWidth().height(40.dp), textColor = Palette.Ink, onClick = onContinue)
             }
         }
     }
@@ -259,8 +272,8 @@ private fun AnalysisCard(
 ) {
     val st = LocalStrings.current
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi).padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi).padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
         if (decided) {
             val label = if (who == null) st.yourAction else st.actionOf(who)
@@ -307,7 +320,11 @@ private fun AnalysisCard(
                 )
             }
         }
-        policy.equity?.let { Text("${st.estEquity}: ${Format.pct(it)}", color = Palette.TextDim, fontSize = 11.sp) }
-        if (policy.potOdds > 0) Text("${st.needEquity}: ${Format.pct(policy.potOdds)}", color = Palette.TextDim, fontSize = 11.sp)
+        // equity and the equity a call needs share one line
+        val eqParts = listOfNotNull(
+            policy.equity?.let { "${st.estEquity} ${Format.pct(it)}" },
+            if (policy.potOdds > 0) "${st.needEquity} ${Format.pct(policy.potOdds)}" else null,
+        )
+        if (eqParts.isNotEmpty()) Text(eqParts.joinToString(" · "), color = Palette.TextDim, fontSize = 11.sp, lineHeight = 14.sp)
     }
 }

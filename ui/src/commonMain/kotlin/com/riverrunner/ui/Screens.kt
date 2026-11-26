@@ -105,13 +105,16 @@ fun HomeScreen(vm: AppViewModel) {
                 .padding(18.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Box(Modifier.height(96.dp).width(130.dp)) {
+            val resume = vm.resumable
+            // with a session to continue there is one more button, so the cards get smaller
+            val cardH = if (resume != null) 44.dp else 62.dp
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (resume != null) 10.dp else 14.dp)) {
+                Box(Modifier.height(if (resume != null) 68.dp else 96.dp).width(130.dp)) {
                     Box(Modifier.align(Alignment.Center).offset(x = (-24).dp).graphicsLayer { rotationZ = -10f }) {
-                        PlayingCard(Cards.parse("As"), 62.dp)
+                        PlayingCard(Cards.parse("As"), cardH)
                     }
                     Box(Modifier.align(Alignment.Center).offset(x = 24.dp).graphicsLayer { rotationZ = 10f }) {
-                        PlayingCard(Cards.parse("Kh"), 62.dp)
+                        PlayingCard(Cards.parse("Kh"), cardH)
                     }
                 }
                 ActionButton(st.startGame, Palette.Gold, textColor = Palette.Ink, modifier = Modifier.width(260.dp).height(52.dp)) {
@@ -121,6 +124,23 @@ fun HomeScreen(vm: AppViewModel) {
                     p.lastMode == GameMode.TOURNAMENT, p.lastSize, p.lastStackBB,
                     p.lastTableType == TableType.MIXED, p.lastHandsPerLevel, p.lastAnte,
                 )
+                if (resume != null) {
+                    val lvl = if (resume.config.mode == GameMode.TOURNAMENT)
+                        resume.handNumber / resume.config.handsPerLevel.coerceAtLeast(1) + 1 else null
+                    val levelBB = com.riverrunner.engine.GameSession.levelFor((lvl ?: 1) - 1).bigBlind
+                    val heroStack = resume.hero?.stack ?: 0
+                    Column(
+                        Modifier.width(260.dp).pressable { vm.continueLastSession() }.clip(RoundedCornerShape(12.dp))
+                            .background(Color(0x66000000)).border(1.dp, Palette.Green.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                    ) {
+                        Text(st.continueLast + "  ▶", color = Palette.Green, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            st.continueSummary(resume.handNumber, vm.fmt(heroStack, if (lvl != null) levelBB else com.riverrunner.engine.GameSession.BASE_BB), lvl),
+                            color = Palette.Text.copy(alpha = 0.85f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
                 Column(
                     Modifier.width(260.dp).pressable { vm.startGame(lastConfig(p)) }.clip(RoundedCornerShape(12.dp))
                         .background(Color(0x66000000)).border(1.dp, Palette.Gold.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
