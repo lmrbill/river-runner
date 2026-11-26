@@ -33,8 +33,9 @@ class SessionPlayer(
     val style: BotStyle,
     val isHuman: Boolean,
     var stack: Int,
+    /** buy-in of the session; a resumed session keeps the original one */
+    val startStack: Int = stack,
 ) {
-    val startStack = stack
     /** 0 while still playing, otherwise finishing place (1 = winner) */
     var place: Int = 0
     val alive: Boolean get() = place == 0 && stack > 0
@@ -52,8 +53,32 @@ data class SessionSummary(
     val endedEarly: Boolean,
 )
 
-/** Drives a whole cash session or single-table tournament. The human always sits in seat 0. */
-class GameSession(val config: SessionConfig) {
+/** One seat of a [SessionSnapshot]. */
+data class SeatSnapshot(
+    val seat: Int, val name: String, val style: BotStyle, val isHuman: Boolean,
+    val stack: Int, val startStack: Int, val place: Int,
+)
+
+/** Where a session stood after its last finished hand, so it can be picked up again later. */
+data class SessionSnapshot(
+    val config: SessionConfig,
+    val handNumber: Int,
+    val buttonSeat: Int,
+    val seats: List<SeatSnapshot>,
+    /** history ids of the hands played so far (for the HUD and "replay last hand") */
+    val handIds: List<Long> = emptyList(),
+) {
+    val hero: SeatSnapshot? get() = seats.firstOrNull { it.isHuman }
+    /** True when the session can still go on: you have chips and someone is left to play. */
+    val playable: Boolean get() = (hero?.let { it.place == 0 && it.stack > 0 } ?: false) &&
+        seats.count { it.place == 0 && it.stack > 0 } >= 2
+}
+
+/**
+ * Drives a whole cash session or single-table tournament. The human always sits in seat 0.
+ * With [resume], picks up a session where it stopped: same seats, stacks, blind level and hand count.
+ */
+class GameSession(val config: SessionConfig, resume: SessionSnapshot? = null) {
     val random = Random(config.seed)
     val players: List<SessionPlayer>
     var handNumber = 0; private set
@@ -78,21 +103,37 @@ class GameSession(val config: SessionConfig) {
 
     init {
         require(config.tableSize in 2..9)
-        val names = BOT_NAMES.shuffled(random)
-        val start = config.startingBB * BASE_BB
-        val bots = config.tableSize - 1
-        val mix = config.styleMix
-        val botStyles: List<BotStyle> = when {
-            config.tableType == TableType.GTO -> List(bots) { BotStyle.GTO }
-            mix == null -> List(bots) { MIXED_POOL[random.nextInt(MIXED_POOL.size)] }
-            else -> mix.assign(bots, random)
+        if (resume != null) {
+            require(resume.seats.size == config.tableSize)
+            players = resume.seats.sortedBy { it.seat }.map { r ->
+                SessionPlayer(r.seat, r.name, r.style, r.isHuman, r.stack, r.startStack).also { it.place = r.place }
+            }
+            handNumber = resume.handNumber
+            buttonSeat = resume.buttonSeat
+        } else {
+            val names = BOT_NAMES.shuffled(random)
+            val start = config.startingBB * BASE_BB
+            val bots = config.tableSize - 1
+            val mix = config.styleMix
+            val botStyles: List<BotStyle> = when {
+                config.tableType == TableType.GTO -> List(bots) { BotStyle.GTO }
+                mix == null -> List(bots) { MIXED_POOL[random.nextInt(MIXED_POOL.size)] }
+                else -> mix.assign(bots, random)
+            }
+            players = List(config.tableSize) { i ->
+                if (i == HERO_SEAT) SessionPlayer(i, "You", BotStyle.GTO, true, start)
+                else SessionPlayer(i, names[i - 1], botStyles[i - 1], false, start)
+            }
+            buttonSeat = random.nextInt(config.tableSize)
         }
-        players = List(config.tableSize) { i ->
-            if (i == HERO_SEAT) SessionPlayer(i, "You", BotStyle.GTO, true, start)
-            else SessionPlayer(i, names[i - 1], botStyles[i - 1], false, start)
-        }
-        buttonSeat = random.nextInt(config.tableSize)
     }
+
+    /** The session as it stands between hands. */
+    fun snapshot(handIds: List<Long> = emptyList()): SessionSnapshot = SessionSnapshot(
+        config, handNumber, buttonSeat,
+        players.map { SeatSnapshot(it.seat, it.name, it.style, it.isHuman, it.stack, it.startStack, it.place) },
+        handIds,
+    )
 
     val hero: SessionPlayer get() = players[HERO_SEAT]
     val alivePlayers: List<SessionPlayer> get() = players.filter { it.alive }

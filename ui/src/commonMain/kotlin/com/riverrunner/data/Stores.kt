@@ -8,6 +8,12 @@ import com.riverrunner.engine.GameMode
 import com.riverrunner.engine.HandRecord
 import com.riverrunner.engine.Progress
 import com.riverrunner.engine.StyleMix
+import com.riverrunner.engine.BotStyle
+import com.riverrunner.engine.SeatSnapshot
+import com.riverrunner.engine.SessionConfig
+import com.riverrunner.engine.SessionSnapshot
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
 import com.riverrunner.engine.TableType
 import com.riverrunner.engine.nowMillis
 import com.riverrunner.locked
@@ -175,6 +181,8 @@ class ProfileStore(private val files: TextFiles, private val prefs: Prefs?, priv
 
     private fun profileFile(id: String) = "profile_$id.json"
     fun historyFile(id: String) = "hands_$id.txt"
+    /** The slot's unfinished session, see [SessionSaves]. */
+    fun sessionFile(id: String) = "session_$id.json"
 
     fun all(): List<Profile> = profiles.values.toList()
     fun active(): Profile = profiles.getValue(activeId)
@@ -229,6 +237,7 @@ class ProfileStore(private val files: TextFiles, private val prefs: Prefs?, priv
         profiles.remove(id) ?: return
         files.delete(profileFile(id))
         files.delete(historyFile(id))
+        files.delete(sessionFile(id))
         if (profiles.isEmpty()) create(defaultName(1), activate = true)
         if (activeId == id) activeId = profiles.keys.first()
         writeIndex()
@@ -307,5 +316,62 @@ class HistoryStore(private val files: TextFiles, private val file: String) {
 
     private fun rewrite() {
         files.write(file, records.joinToString("") { it.encode() + "\n" })
+    }
+}
+
+/**
+ * The last session of one save slot, as it stood after its last finished hand, so "Continue last
+ * session" can pick it up again with the same seats, stacks, blind level and hand count.
+ */
+class SessionSaves(private val files: TextFiles, private val file: String) {
+    fun read(): SessionSnapshot? = files.read(file)?.let { decode(it) }
+
+    fun write(s: SessionSnapshot) = files.write(file, encode(s))
+
+    fun clear() = files.delete(file)
+
+    companion object {
+        fun encode(s: SessionSnapshot): String = buildJsonObject {
+            val c = s.config
+            put("v", 1)
+            put("mode", c.mode.code); put("size", c.tableSize); put("bb", c.startingBB)
+            put("table", if (c.tableType == TableType.MIXED) "M" else "G")
+            put("hpl", c.handsPerLevel); put("ante", c.cashAnteFraction)
+            c.styleMix?.let { put("mix", it.encode()) }
+            put("hand", s.handNumber); put("button", s.buttonSeat)
+            put("seats", buildJsonArray {
+                for (p in s.seats) add(buildJsonObject {
+                    put("s", p.seat); put("n", p.name); put("st", p.style.code); put("h", p.isHuman)
+                    put("k", p.stack); put("b", p.startStack); put("p", p.place)
+                })
+            })
+            put("ids", buildJsonArray { s.handIds.forEach { add(JsonPrimitive(it)) } })
+        }.toString()
+
+        fun decode(text: String): SessionSnapshot? = runCatching {
+            val o = Json.parseToJsonElement(text).jsonObject
+            val config = SessionConfig(
+                mode = GameMode.fromCode(o.getValue("mode").jsonPrimitive.content),
+                tableSize = o.getValue("size").jsonPrimitive.int,
+                startingBB = o.getValue("bb").jsonPrimitive.int,
+                tableType = if (o["table"]?.jsonPrimitive?.content == "M") TableType.MIXED else TableType.GTO,
+                handsPerLevel = o["hpl"]?.jsonPrimitive?.intOrNull ?: 10,
+                cashAnteFraction = o["ante"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+                styleMix = (o["mix"] as? JsonPrimitive)?.content?.let { StyleMix.decode(it) },
+            )
+            val seats = o.getValue("seats").jsonArray.map { e ->
+                val p = e.jsonObject
+                SeatSnapshot(
+                    seat = p.getValue("s").jsonPrimitive.int, name = p.getValue("n").jsonPrimitive.content,
+                    style = BotStyle.fromCode(p.getValue("st").jsonPrimitive.content),
+                    isHuman = p["h"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    stack = p.getValue("k").jsonPrimitive.int, startStack = p.getValue("b").jsonPrimitive.int,
+                    place = p["p"]?.jsonPrimitive?.intOrNull ?: 0,
+                )
+            }
+            val ids = (o["ids"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.longOrNull } ?: emptyList()
+            SessionSnapshot(config, o.getValue("hand").jsonPrimitive.int, o.getValue("button").jsonPrimitive.int, seats, ids)
+                .takeIf { it.seats.size == config.tableSize }
+        }.getOrNull()
     }
 }
