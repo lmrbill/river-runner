@@ -230,8 +230,9 @@ jobs:
           git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" screenshots
 
   # Web version (iPhone and other browsers): Wasm build with a JS fallback for older browsers.
-  # The log always goes to the web-logs branch; a successful build is published to gh-pages,
-  # which GitHub Pages serves at https://<owner>.github.io/<repo>/.
+  # The log always goes to the web-logs branch; a successful build goes to the web-build branch,
+  # which the Claude page is made from. The old GitHub Pages site (gh-pages branch) is no longer
+  # updated: it stays at its last version.
   web:
     runs-on: ubuntu-latest
     steps:
@@ -280,7 +281,7 @@ jobs:
           git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "web log ${GITHUB_SHA::7}"
           git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" web-logs
 
-      - name: Publish to gh-pages
+      - name: Publish to web-build
         if: success() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/dev-web'))
         env:
           GH_TOKEN: ${{ github.token }}
@@ -299,6 +300,6 @@ jobs:
           ls -la
           touch .nojekyll
           echo "${GITHUB_SHA}" > COMMIT
-          git init -q && git checkout -q -b gh-pages && git add -A
+          git init -q && git checkout -q -b web-build && git add -A
           git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "Web app ${GITHUB_SHA::7}"
-          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" web-build
